@@ -1,7 +1,9 @@
-CREATE DATABASE ProyectoProgramacionSqlServer_02
+CREATE DATABASE ProyectoProgramacionSqlServer_11
 GO
-USE ProyectoProgramacionSqlServer_02
+USE ProyectoProgramacionSqlServer_11
 GO
+
+SET DATEFORMAT 'YMD';
 
 --Creación de tablas
 CREATE TABLE fabricante
@@ -70,7 +72,7 @@ CREATE TABLE refrigeracionGpu
 (
  CodRefGpu INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  Modelo VARCHAR(100) NOT NULL UNIQUE,
- Tipo VARCHAR(7) NOT NULL CHECK (Tipo IN ('aire(por defecto)','liquida')),
+ Tipo VARCHAR(20) NOT NULL CHECK (Tipo IN ('aire(por defecto)','liquida')),
  Stock INT NOT NULL CHECK (Stock>=0),
  CodFab INT NOT NULL,
  FOREIGN KEY (CodFab) REFERENCES fabricante(CodFab)
@@ -105,7 +107,7 @@ CREATE TABLE ram
  CodRam INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  Precio FLOAT NOT NULL CHECK (Precio>0),
  Modelo VARCHAR(100) NOT NULL UNIQUE,
- Frecuencia FLOAT NOT NULL CHECK (Frecuencia BETWEEN 1000 AND 8000),
+ Frecuencia FLOAT NOT NULL CHECK (Frecuencia BETWEEN 500 AND 8000),
  Tipo VARCHAR(10) NOT NULL CHECK (Tipo IN ('DDR','DDR2','DDR3','DDR4','DDR5')),
  Consumo FLOAT NOT NULL CHECK (Consumo>0),
  Stock INT NOT NULL CHECK (Stock>=0),
@@ -152,10 +154,11 @@ CREATE TABLE placaBase
  maxRam INT NOT NULL CHECK (maxRam>=2),
  maxCpu INT NOT NULL CHECK (maxCpu>=1),
  maxGpu INT NOT NULL CHECK (maxGpu>=0),
+ tipoRam VARCHAR(10) NOT NULL CHECK (tipoRam IN ('DDR','DDR2','DDR3','DDR4','DDR5')),
  FF VARCHAR(50) NOT NULL CHECK (FF IN ('ATX','Micro ATX','Mini ITX','E-ATX')),
  Stock INT NOT NULL CHECK (Stock>=0),
  Chipset VARCHAR(50) NOT NULL,
- Socket VARCHAR(50) NOT NULL CHECK (Socket IN ('AM4','AM5','LGA1200','LGA1700','LGA1851','sTRX4','sTR5','SP3','LGA4189','ARM','Apple M4')),
+ Socket VARCHAR(50) NOT NULL CHECK (Socket IN ('AM4','AM5','LGA1200','LGA1700','LGA1851','sTRX4','sTR5','SP3','LGA4189','ARM','Apple M4','LGA2066')),
  Modelo VARCHAR(100) NOT NULL UNIQUE,
  CodFab INT NOT NULL,
  FOREIGN KEY (CodFab) REFERENCES fabricante(CodFab)
@@ -284,29 +287,28 @@ CREATE TABLE montaje
  CodMontaje INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  Fecha DATE NOT NULL DEFAULT GETDATE(),
  Detalles VARCHAR(500) NOT NULL,
- Precio FLOAT NOT NULL CHECK (Precio>0),
+ Precio FLOAT NOT NULL DEFAULT 250,
  CodOrd INT NOT NULL,
  FOREIGN KEY (CodOrd) REFERENCES ordenador(CodOrd),
  CodMon INT NOT NULL,
  FOREIGN KEY (CodMon) REFERENCES montador(CodMon)
 );
-CREATE TABLE servicioMantenimiento
+CREATE TABLE servicioTesteo
 (
- CodSerMan INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
+ CodSerTest INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  Nombre VARCHAR(50) NOT NULL UNIQUE,
  Estrellas FLOAT NOT NULL CHECK (Estrellas BETWEEN 1 AND 5)
 );
-CREATE TABLE mantenimiento
+CREATE TABLE testeo
 (
- CodMan INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
- Tipo VARCHAR(50) NOT NULL CHECK (Tipo IN ('ComprobacionFuncionamientoInicial','Reparacion')),
- Precio FLOAT NOT NULL CHECK (Precio>0),
+ CodTest INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
+ Precio FLOAT NOT NULL DEFAULT 50,
  Fecha DATE NOT NULL DEFAULT GETDATE(),
  Reporte VARCHAR(500) NOT NULL,
  CodOrd INT NOT NULL,
- CodSerMan INT NOT NULL,
+ CodSerTest INT NOT NULL,
  FOREIGN KEY (CodOrd) REFERENCES ordenador(CodOrd),
- FOREIGN KEY (CodSerMan) REFERENCES servicioMantenimiento(CodSerMan)
+ FOREIGN KEY (CodSerTest) REFERENCES servicioTesteo(CodSerTest)
 );
 CREATE TABLE usuario
 (
@@ -315,23 +317,28 @@ CREATE TABLE usuario
  Ape1Usu VARCHAR(50) NOT NULL,
  Ape2Usu VARCHAR(50) NULL,
  DNI CHAR(9) NOT NULL UNIQUE CHECK (LEN(DNI)=9 AND DNI LIKE (REPLICATE('[0-9]',8)+'[A-Z]')),
- FecNac DATE NOT NULL,
+ FecNac DATE NOT NULL CHECK (FecNac <= DATEADD(YEAR, -18, GETDATE())),
+ DireccionCompleta VARCHAR(200) NOT NULL,
+ Correo VARCHAR(100) NOT NULL,
+ Contrasenia VARCHAR(100) NOT NULL,
  EsAdministrador TINYINT NOT NULL
 );
 CREATE TABLE carrito
 (
  CodCar INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  Fecha DATE NOT NULL DEFAULT GETDATE(),
- PrecioTotal FLOAT NOT NULL CHECK (PrecioTotal>0),
- Estado VARCHAR(50) NOT NULL CHECK (Estado IN ('compraNoRealizada','compraNoRealizada')) DEFAULT 'compraNoRealizada',
+ PrecioTotal FLOAT NULL CHECK (PrecioTotal>0), --Se deja a null y luego se cambia en base a las diferentes entradas en contenido_carrito
+ Estado VARCHAR(50) NOT NULL CHECK (Estado IN ('compraRealizada','compraNoRealizada')) DEFAULT 'compraNoRealizada',
  CodUsu INT NOT NULL,
  FOREIGN KEY (CodUsu) REFERENCES usuario(CodUsu)
 );
+--Esta tabla solo puede albercar un producto a la vez (en la cantidad que sea), hace referencia a una entrada de un carrito, 
+--un carrito completo estará asociado a 1 o muchas entradas de esta tabla
 CREATE TABLE contenido_carrito
 (
  CodConCar INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
- Precio FLOAT NOT NULL,
- Cantidad INT NOT NULL,
+ Precio FLOAT NULL CHECK (Precio>0), --se deja a null y luega se actualiza en base a la cantidad
+ Cantidad INT NOT NULL CHECK (Cantidad>0),
  CodCar INT NOT NULL,
  FOREIGN KEY (CodCar) REFERENCES carrito(CodCar),
  CodOrd INT NULL,
@@ -361,7 +368,7 @@ CREATE TABLE contenido_carrito
 --Inserción de datos iniciales (todas las verificaciones de logica interna, ej: que el socket de la cpu sea compatible
 --con la placa base, o que no haya más de un carrito en estado de "compraNoRealizada"; se realizará desde Java y no aqui, 
 --los ordenadores preemontados iniciales que se agregarán cumpliran ya con todas las restricciones
-INSERT INTO fabricante (NomFab) 
+INSERT INTO fabricante (NomFab)
 VALUES ('Corsair'),
        ('Asus'),
        ('MSI'),
@@ -373,71 +380,93 @@ VALUES ('Corsair'),
        ('Be Quiet!'),
        ('Western Digital'),
        ('Samsung'),
-       ('Crucial');
+       ('Crucial'),
+       ('AMD'),
+       ('Intel'),
+       ('Apple'),
+       ('ARM'),
+       ('Nvidia'),
+       ('Noctua'),
+       ('Arctic'),
+       ('Thermaltake'),
+       ('Fractal Design'),
+       ('G.SKILL'),
+       ('Kingston'),
+       ('ADATA'),
+       ('Patriot'),
+       ('TeamGroup'),
+       ('Seagate'),
+       ('SanDisk'),
+       ('SilverStone'),
+       ('Antec'),
+       ('Phanteks'),
+       ('Lian Li'),
+       ('ASRock');
 INSERT INTO cpu (Precio,Modelo,Consumo,Stock,Nucleos,Socket,Frecuencia,CodFab)
-VALUES (0,'Ryzen 5 5600X',65,10,6,'AM4',3.7,1),
-       (0,'Ryzen 7 5800X',105,8,8,'AM4',3.8,1),
-       (0,'Core i5-12600K',125,15,10,'LGA1700',3.7,2),
-       (0,'Core i7-13700K',125,12,16,'LGA1700',3.4,2),
-       (0,'Ryzen 9 5950X',105,5,16,'AM4',3.4,1),
-       (0,'Core i9-12900KS',150,7,16,'LGA1700',3.4,2),
-       (0,'Threadripper 3990X',280,3,64,'sTRX4',2.9,1),
-       (0,'EPYC 7763',280,2,64,'SP3',2.45,1),
-       (0,'Xeon Platinum 8380',270,1,40,'LGA4189',2.3,2),
-       (0,'Cortex-A76',5,50,4,'ARM',2.2,3),
-       (0,'M4 Max 16-Core',60,20,16,'Apple M4',3.2,4),
-       (0,'Core Ultra 9 285K',125,10,24,'LGA1851',3.5,2),
-       (0,'Threadripper 7980X',350,5,64,'sTR5',3.2,1),
-       (0,'Threadripper 7970X',350,8,32,'sTR5',4.0,1),
-       (0,'Threadripper 7995WX',350,2,96,'sTR5',2.5,1);
+VALUES (299,'Ryzen 5 5600X',65,10,6,'AM4',3.7,13),
+       (399,'Ryzen 7 5800X',105,8,8,'AM4',3.8,13),
+       (319,'Core i5-12600K',125,15,10,'LGA1700',3.7,14),
+       (449,'Core i7-13700K',125,12,16,'LGA1700',3.4,14),
+       (749,'Ryzen 9 5950X',105,5,16,'AM4',3.4,13),
+       (799,'Core i9-12900KS',150,7,16,'LGA1700',3.4,14),
+       (3990,'Threadripper 3990X',280,3,64,'sTRX4',2.9,13),
+       (7890,'EPYC 7763',280,2,64,'SP3',2.45,13),
+       (9999,'Xeon Platinum 8380',270,1,40,'LGA4189',2.3,14),
+       (50,'Cortex-A76',5,50,4,'ARM',2.2,16),
+       (3200,'M4 Max 16-Core',60,20,16,'Apple M4',3.2,15),
+       (699,'Core Ultra 9 285K',125,10,24,'LGA1851',3.5,14),
+       (4999,'Threadripper 7980X',350,5,64,'sTR5',3.2,13),
+       (3999,'Threadripper 7970X',350,8,32,'sTR5',4.0,13),
+       (6999,'Threadripper 7995WX',350,2,96,'sTR5',2.5,13),
+	   (8500,'Xeon W-3300',200,5,16,'LGA2066',3.0,14);
 INSERT INTO refrigeracionCpu (Precio,Modelo,Consumo,Tipo,Stock,CodFab)  
-VALUES (0,'Cooler Master Hyper 212',20,'aire',15,1),  
-       (0,'Corsair A500',25,'aire',10,2),  
-       (0,'NZXT Kraken X53',30,'aire',5,3),  
-       (0,'Be Quiet! Pure Rock 2',15,'aire',8,4),  
-       (0,'Cooler Master Hyper 212 EVO',18,'aire',0,1),
-       (0,'Corsair iCUE H100i Elite Capellix',50,'liquida',7,2),  
-       (0,'NZXT Kraken Z73',60,'liquida',4,3),  
-       (0,'Be Quiet! Silent Loop 2',45,'liquida',3,4),  
-       (0,'Corsair iCUE H150i Elite Capellix',55,'liquida',12,2),  
-       (0,'Cooler Master MasterLiquid ML240L',40,'liquida',0,1);
-INSERT INTO refrigeracionCpu_aire (Velocidad, CodRefCpu)  
+VALUES (40,'Cooler Master Hyper 212',20,'aire',15,6),  
+       (80,'Corsair A500',25,'aire',10,1),  
+       (120,'NZXT Kraken X53',30,'aire',5,5),  
+       (45,'Be Quiet! Pure Rock 2',15,'aire',8,9),  
+       (35,'Cooler Master Hyper 212 EVO',18,'aire',0,6),
+       (150,'Corsair iCUE H100i Elite Capellix',50,'liquida',7,1),  
+       (180,'NZXT Kraken Z73',60,'liquida',4,5),  
+       (140,'Be Quiet! Silent Loop 2',45,'liquida',3,9),  
+       (170,'Corsair iCUE H150i Elite Capellix',55,'liquida',12,1),  
+       (100,'Cooler Master MasterLiquid ML240L',40,'liquida',0,6);
+INSERT INTO refrigeracionCpu_aire (Velocidad,CodRefCpu)  
 VALUES (1500,1),  
        (1800,2),  
        (NULL,3),
        (2500,4),  
        (NULL,5);
-INSERT INTO refrigeracionCpu_liquida (PotBomb, CodRefCpu)  
+INSERT INTO refrigeracionCpu_liquida (PotBomb,CodRefCpu)  
 VALUES (20,6),  
        (25,7),  
        (30,8),  
        (35,9),  
        (40,10);
 INSERT INTO gpu (Precio,Modelo,Stock,VRAM,Frecuencia,TipoMem,Consumo,CodFab)  
-VALUES (0,'NVIDIA GeForce RTX 3060',10,12,1.78,'GDDR6',170,1),  
-       (0,'NVIDIA GeForce RTX 3080',0,10,1.44,'GDDR6X',320,1),  
-       (0,'AMD Radeon RX 6700 XT',8,12,2.42,'GDDR6',230,2),  
-       (0,'NVIDIA GeForce RTX 4090',0,24,2.52,'GDDR6X',450,1),  
-       (0,'AMD Radeon RX 6800 XT',7,16,2.25,'GDDR6',300,2),  
-       (0,'NVIDIA GeForce GTX 1650',15,4,1.50,'GDDR5',75,1),  
-       (0,'NVIDIA Quadro RTX 8000',3,48,1.77,'GDDR6',295,1),  
-       (0,'AMD Radeon RX 5700',10,8,1.73,'GDDR6',225,2),  
-       (0,'NVIDIA Titan RTX',4,24,1.77,'GDDR6',280,1),  
-       (0,'NVIDIA GeForce GTX 1050 Ti',12,4,1.39,'GDDR5',75,1);  
+VALUES (300,'NVIDIA GeForce RTX 3060',10,12,1.78,'GDDR6',170,17),  
+       (800,'NVIDIA GeForce RTX 3080',0,10,1.44,'GDDR6X',320,17),  
+       (400,'AMD Radeon RX 6700 XT',8,12,2.42,'GDDR6',230,13),  
+       (1600,'NVIDIA GeForce RTX 4090',0,24,2.52,'GDDR6X',450,17),  
+       (550,'AMD Radeon RX 6800 XT',7,16,2.25,'GDDR6',300,13),  
+       (200,'NVIDIA GeForce GTX 1650',15,4,1.50,'GDDR5',75,17),  
+       (5000,'NVIDIA Quadro RTX 8000',3,48,1.77,'GDDR6',295,17),  
+       (300,'AMD Radeon RX 5700',10,8,1.73,'GDDR6',225,13),  
+       (2500,'NVIDIA Titan RTX',4,24,1.77,'GDDR6',280,17),  
+       (150,'NVIDIA GeForce GTX 1050 Ti',12,4,1.39,'GDDR5',75,17);
 INSERT INTO refrigeracionGpu (Modelo,Tipo,Stock,CodFab)  
-VALUES ('Refrigeración por defecto con aire de NVIDIA GeForce RTX 3060','aire(por defecto)',10,1),  
-       ('Refrigeración por defecto con aire de NVIDIA GeForce RTX 3080','aire(por defecto)',5,1),  
-       ('Refrigeración por defecto con aire de AMD Radeon RX 6700 XT','aire(por defecto)',8,2),  
+VALUES ('Refrigeración por defecto con aire de NVIDIA GeForce RTX 3060','aire(por defecto)',10,17),  
+       ('Refrigeración por defecto con aire de NVIDIA GeForce RTX 3080','aire(por defecto)',5,17),  
+       ('Refrigeración por defecto con aire de AMD Radeon RX 6700 XT','aire(por defecto)',8,13),  
        ('Refrigeración líquida Corsair iCUE H150i Elite Capellix','liquida',2,1),  
-       ('Refrigeración por defecto con aire de NVIDIA GeForce RTX 4090','aire(por defecto)',3,1),  
-       ('Refrigeración líquida NZXT Kraken Z63','liquida',7,2),  
-       ('Refrigeración por defecto con aire de AMD Radeon RX 6800 XT','aire(por defecto)',10,2),  
+       ('Refrigeración por defecto con aire de NVIDIA GeForce RTX 4090','aire(por defecto)',3,17),  
+       ('Refrigeración líquida NZXT Kraken Z63','liquida',7,5),  
+       ('Refrigeración por defecto con aire de AMD Radeon RX 6800 XT','aire(por defecto)',10,13),  
        ('Refrigeración líquida ASUS ROG Strix LC 360','liquida',4,2),  
-       ('Refrigeración por defecto con aire de NVIDIA Quadro RTX 8000','aire(por defecto)',3,1),  
-       ('Refrigeración por defecto con aire de NVIDIA GeForce GTX 1650','aire(por defecto)',15,1),
-       ('Refrigeración por defecto con aire de AMD Radeon RX 5700','aire(por defecto)',4,1),
-	   ('Refrigeración por defecto con aire de NVIDIA Titan RTX','aire(por defecto)',7,1),
-       ('Refrigeración por defecto con aire de NVIDIA GeForce GTX 1050 Ti','aire(por defecto)',23,1);
+       ('Refrigeración por defecto con aire de NVIDIA Quadro RTX 8000','aire(por defecto)',3,17),  
+       ('Refrigeración por defecto con aire de NVIDIA GeForce GTX 1650','aire(por defecto)',15,17),
+       ('Refrigeración por defecto con aire de AMD Radeon RX 5700','aire(por defecto)',4,13),
+	   ('Refrigeración por defecto con aire de NVIDIA Titan RTX','aire(por defecto)',7,17),
+       ('Refrigeración por defecto con aire de NVIDIA GeForce GTX 1050 Ti','aire(por defecto)',23,17);
 INSERT INTO refrigeracionGpu_aire (Velocidad,CodRefGpu)  
 VALUES (2500,1),  
        (2500,2),  
@@ -450,100 +479,100 @@ VALUES (2500,1),
        (2500,12),  
        (2500,13);
 INSERT INTO refrigeracionGpu_liquida (Precio,PotBomb,Consumo,CodRefGpu)  
-VALUES (0,25,50,4),  
-       (0,25,50,6),  
-       (0,25,50,8);
+VALUES (200,25,50,4),  
+       (180,25,50,6),  
+       (220,25,50,8);
 INSERT INTO ventilador (Precio,Modelo,Consumo,Velocidad,Stock,CodFab)  
-VALUES (0,'Ventilador Noctua NF-A12x25 PWM',0.6,2000,10,1),  
-       (0,'Ventilador Corsair ML120 PRO',0.4,2400,5,2),  
-       (0,'Ventilador be quiet! Silent Wings 3',0.5,2200,8,1),  
-       (0,'Ventilador Arctic P12 PWM',0.3,1800,15,3),  
-       (0,'Ventilador Cooler Master MasterFan MF120R ARGB',0.6,2000,0,4),  
-       (0,'Ventilador Thermaltake Riing Plus 12 RGB',0.7,1500,7,2),  
-       (0,'Ventilador Fractal Design Dynamic X2 GP-12',0.4,1200,12,3),  
-       (0,'Ventilador NZXT Aer P 120mm',0.5,1500,3,4),  
-       (0,'Ventilador EVGA Hybrid 120mm',0.9,2200,0,5),  
-       (0,'Ventilador Cooler Master SickleFlow 120mm',0.5,1800,6,1);
+VALUES (25,'Ventilador Noctua NF-A12x25 PWM',0.6,2000,10,18),  
+       (28,'Ventilador Corsair ML120 PRO',0.4,2400,5,1),  
+       (23,'Ventilador be quiet! Silent Wings 3',0.5,2200,8,9),  
+       (15,'Ventilador Arctic P12 PWM',0.3,1800,15,19),  
+       (30,'Ventilador Cooler Master MasterFan MF120R ARGB',0.6,2000,0,6),  
+       (35,'Ventilador Thermaltake Riing Plus 12 RGB',0.7,1500,7,20),  
+       (18,'Ventilador Fractal Design Dynamic X2 GP-12',0.4,1200,12,21),  
+       (22,'Ventilador NZXT Aer P 120mm',0.5,1500,3,5),  
+       (40,'Ventilador EVGA Hybrid 120mm',0.9,2200,0,7),  
+       (20,'Ventilador Cooler Master SickleFlow 120mm',0.5,1800,6,6);
 INSERT INTO ram (Precio,Modelo,Frecuencia,Tipo,Consumo,Stock,CodFab)  
-VALUES (0,'Corsair Vengeance LPX 8GB DDR4',3200,'DDR4',1.2,10,1),  
-       (0,'G.SKILL Ripjaws V 16GB DDR4',3600,'DDR4',1.35,5,2),  
-       (0,'Kingston HyperX Fury 16GB DDR4',2666,'DDR4',1.2,0,3),  
-       (0,'Crucial Ballistix 8GB DDR4',3000,'DDR4',1.35,8,4),  
-       (0,'Corsair Vengeance LPX 32GB DDR4',2933,'DDR4',1.2,3,1),  
-       (0,'ADATA XPG Z1 16GB DDR3',1600,'DDR3',1.5,12,2),  
-       (0,'HyperX Predator 8GB DDR4',4000,'DDR4',1.35,0,5),  
-       (0,'G.SKILL Trident Z 16GB DDR4',3200,'DDR4',1.35,7,3),  
-       (0,'Patriot Viper 4 16GB DDR4',3600,'DDR4',1.35,6,4),  
-       (0,'TeamGroup T-Force Delta RGB 8GB DDR4',3200,'DDR4',1.35,2,1),
-       (0,'Samsung 8GB DDR3',1333,'DDR3',1.5,4,2),
-       (0,'Crucial 4GB DDR2',800,'DDR2',1.8,0,3),
-       (0,'Corsair Vengeance 16GB DDR5',4800,'DDR5',1.4,10,1),
-       (0,'Kingston FURY Beast 32GB DDR5',5200,'DDR5',1.5,5,4),
-       (0,'Corsair Dominator Platinum 8GB DDR5',6000,'DDR5',1.4,8,2);
+VALUES (35,'Corsair Vengeance LPX 8GB DDR4',3200,'DDR4',1.2,10,1),  
+       (70,'G.SKILL Ripjaws V 16GB DDR4',3600,'DDR4',1.35,5,22),  
+       (65,'Kingston HyperX Fury 16GB DDR4',2666,'DDR4',1.2,0,23),  
+       (40,'Crucial Ballistix 8GB DDR4',3000,'DDR4',1.35,8,12),  
+       (120,'Corsair Vengeance LPX 32GB DDR4',2933,'DDR4',1.2,3,1),  
+       (50,'ADATA XPG Z1 16GB DDR3',1600,'DDR3',1.5,12,24),  
+       (85,'HyperX Predator 8GB DDR4',4000,'DDR4',1.35,0,23),  
+       (75,'G.SKILL Trident Z 16GB DDR4',3200,'DDR4',1.35,7,22),  
+       (80,'Patriot Viper 4 16GB DDR4',3600,'DDR4',1.35,6,25),  
+       (45,'TeamGroup T-Force Delta RGB 8GB DDR4',3200,'DDR4',1.35,2,26),
+       (30,'Samsung 8GB DDR3',1333,'DDR3',1.5,4,11),
+       (20,'Crucial 4GB DDR2',800,'DDR2',1.8,0,12),
+       (150,'Corsair Vengeance 16GB DDR5',4800,'DDR5',1.4,10,1),
+       (280,'Kingston FURY Beast 32GB DDR5',5200,'DDR5',1.5,5,23),
+       (200,'Corsair Dominator Platinum 8GB DDR5',6000,'DDR5',1.4,8,1);
 INSERT INTO almacenamiento (Precio,Modelo,Capacidad,Consumo,Stock,CodFab)  
-VALUES (0,'Samsung 970 EVO Plus 500GB',500,'5',20,1),  
-       (0,'Kingston A2000 1TB',1000,'4.2',15,2),  
-       (0,'Western Digital Blue 500GB',500,'3.5',25,3),  
-       (0,'Crucial MX500 2TB',2000,'4.5',8,4),  
-       (0,'Seagate Barracuda 4TB',4000,'6',12,5),  
-       (0,'Intel Optane 905P 480GB',480,'8',6,1),  
-       (0,'SanDisk Ultra 3D 1TB',1000,'4.5',18,2),  
-       (0,'Corsair MP600 1TB',1000,'7.5',10,6),  
-       (0,'ADATA SU800 512GB',512,'3.8',14,3),  
-       (0,'Western Digital Black SN850 1TB',1000,'8',10,4);
+VALUES (75,'Samsung 970 EVO Plus 500GB',500,'5',20,11),  
+       (90,'Kingston A2000 1TB',1000,'4.2',15,23),  
+       (50,'Western Digital Blue 500GB',500,'3.5',25,10),  
+       (180,'Crucial MX500 2TB',2000,'4.5',8,12),  
+       (100,'Seagate Barracuda 4TB',4000,'6',12,27),  
+       (400,'Intel Optane 905P 480GB',480,'8',6,14),  
+       (110,'SanDisk Ultra 3D 1TB',1000,'4.5',18,28),  
+       (130,'Corsair MP600 1TB',1000,'7.5',10,1),  
+       (60,'ADATA SU800 512GB',512,'3.8',14,24),  
+       (150,'Western Digital Black SN850 1TB',1000,'8',10,10);
 INSERT INTO fuente (Precio,Modelo,Stock,Potencia,Eficiencia,CodFab)  
-VALUES (0,'Corsair RM850x',50,850,0.9,1),  
-       (0,'Seasonic Focus GX-750',30,750,0.92,2),  
-       (0,'EVGA SuperNOVA 1000 G5',25,1000,0.94,3),  
-       (0,'Cooler Master MWE Gold 650',40,650,0.85,4),  
-       (0,'be quiet! Dark Power Pro 12 1500W',10,1500,0.94,5),  
-       (0,'Thermaltake Toughpower PF1 750W',20,750,0.88,6),  
-       (0,'Gigabyte AORUS P850W',35,850,0.9,7),  
-       (0,'SilverStone Strider Platinum 1000W',15,1000,0.92,8),  
-       (0,'Fractal Design Ion+ 860W',18,860,0.9,9),  
-       (0,'Antec High Current Gamer 750W',22,750,0.86,10);
+VALUES (140,'Corsair RM850x',50,850,0.9,1),  
+       (120,'Seasonic Focus GX-750',30,750,0.92,8),  
+       (180,'EVGA SuperNOVA 1000 G5',25,1000,0.94,7),  
+       (90,'Cooler Master MWE Gold 650',40,650,0.85,6),  
+       (250,'be quiet! Dark Power Pro 12 1500W',10,1500,0.94,9),  
+       (130,'Thermaltake Toughpower PF1 750W',20,750,0.88,20),  
+       (140,'Gigabyte AORUS P850W',35,850,0.9,4),  
+       (190,'SilverStone Strider Platinum 1000W',15,1000,0.92,29),  
+       (160,'Fractal Design Ion+ 860W',18,860,0.9,21),  
+       (110,'Antec High Current Gamer 750W',22,750,0.86,30);
 INSERT INTO chasis (Precio,Modelo,Color,Stock,Tamanio,CodFab)
-VALUES (0,'NZXT H510','Negro',25,'Mid',1),
-       (0,'Corsair iCUE 4000X','Blanco',15,'Mid',2),
-       (0,'Fractal Design Meshify C','Negro',30,'Mid',3),
-       (0,'Cooler Master MasterBox Q300L','Negro',40,'Micro',4),
-       (0,'be quiet! Pure Base 500','Blanco',10,'Mid',5),
-       (0,'Thermaltake Core P5','Negro',5,'Full Tower',6),
-       (0,'Phanteks Eclipse P400A','Negro',20,'Mid',7),
-       (0,'Lian Li PC-O11 Dynamic','Aluminio',18,'E-ATX',8),
-       (0,'Corsair 275R Airflow','Negro',28,'Mid',9),
-       (0,'Antec P120 Crystal','Blanco',12,'Mid',10);
-INSERT INTO placaBase (Precio,maxRam,maxCpu,maxGpu,FF,Stock,Chipset,Socket,Modelo,CodFab)  
-VALUES (0,0,0,0,'ATX',30,'X570','AM4','ASUS ROG Crosshair VIII Hero',1),  
-       (0,0,0,0,'Micro ATX',25,'B460','LGA1200','MSI MAG B460M Mortar WiFi',2),  
-       (0,0,0,0,'Mini ITX',18,'Z490','LGA1200','ASRock Z490 Phantom Gaming-ITX/TB3',3),  
-       (0,0,0,0,'E-ATX',10,'TRX40','sTRX4','Gigabyte TRX40 AORUS XTREME',4),  
-       (0,0,0,0,'ATX',40,'Z590','LGA1200','ASUS TUF Gaming Z590-Plus WiFi',5),  
-       (0,0,0,0,'Micro ATX',50,'B550','AM4','MSI MAG B550M Mortar WiFi',6),  
-       (0,0,0,0,'ATX',20,'Z690','LGA1700','Gigabyte Z690 AORUS Master',7),  
-       (0,0,0,0,'E-ATX',5,'X299','LGA2066','ASRock X299 Taichi CL',8),  
-       (0,0,0,0,'ATX',15,'B550','AM4','MSI MPG B550 Gaming Edge WiFi',9),  
-       (0,0,0,0,'Mini ITX',12,'Z590','LGA1200','ASRock Z590 Phantom Gaming-ITX/TB3',10);
+VALUES (100,'NZXT H510','Negro',25,'Mid',5),
+       (120,'Corsair iCUE 4000X','Blanco',15,'Mid',1),
+       (110,'Fractal Design Meshify C','Negro',30,'Mid',21),
+       (60,'Cooler Master MasterBox Q300L','Negro',40,'Micro',6),
+       (90,'be quiet! Pure Base 500','Blanco',10,'Mid',9),
+       (140,'Thermaltake Core P5','Negro',5,'Full Tower',20),
+       (110,'Phanteks Eclipse P400A','Negro',20,'Mid',31),
+       (150,'Lian Li PC-O11 Dynamic','Aluminio',18,'E-ATX',32),
+       (100,'Corsair 275R Airflow','Negro',28,'Mid',1),
+       (130,'Antec P120 Crystal','Blanco',12,'Mid',30);
+INSERT INTO placaBase (Precio,maxRam,maxCpu,maxGpu,tipoRam,FF,Stock,Chipset,Socket,Modelo,CodFab)  
+VALUES (400,4,1,3,'DDR4','ATX',30,'X570','AM4','ASUS ROG Crosshair VIII Hero',2),  
+       (150,4,1,2,'DDR4','Micro ATX',25,'B460','LGA1200','MSI MAG B460M Mortar WiFi',3),  
+       (250,2,1,1,'DDR4','Mini ITX',18,'Z490','LGA1200','ASRock Z490 Phantom Gaming-ITX/TB3',33),  
+       (700,8,2,4,'DDR4','E-ATX',10,'TRX40','sTRX4','Gigabyte TRX40 AORUS XTREME',4),  
+       (300,4,1,3,'DDR4','ATX',40,'Z590','LGA1200','ASUS TUF Gaming Z590-Plus WiFi',2),  
+       (180,4,1,2,'DDR4','Micro ATX',50,'B550','AM4','MSI MAG B550M Mortar WiFi',3),  
+       (500,4,1,3,'DDR5','ATX',20,'Z690','LGA1700','Gigabyte Z690 AORUS Master',4),  
+       (600,8,2,4,'DDR4','E-ATX',5,'X299','LGA2066','ASRock X299 Taichi CL',33),  
+       (220,4,1,2,'DDR4','ATX',15,'B550','AM4','MSI MPG B550 Gaming Edge WiFi',3),  
+       (270,2,1,1,'DDR4','Mini ITX',12,'Z590','LGA1200','ASRock Z590 Phantom Gaming-ITX/TB3',33);
 
 --Insercion de ordenadores preemontados con componentes compatibles
 INSERT INTO ordenador (Nombre,Precio,Proposito,Stock,SO,CodCha,CodPB,CodAlmPrincipal)
 VALUES ('Oficina Pro Max',NULL,'PC/Oficina',5,'Windows 11',1,7,1),
        ('Oficina Pro',NULL,'PC/Oficina',4,'Windows 10',4,6,2),
-	   ('Workstation Pro',NULL,'workstation',2,'Windows 10 Pro',8,7,2),
-	   ('Gaming Beast',NULL,'gaming',3,'Windows 11 Pro',9,7,8),
-	   ('Gaming Lite',NULL,'gaming',2,'Windows 10',10,6,2),
-	   ('Servidor Ultra',NULL,'servidor',2,'Windows Server 2019',6,7,2),
-	   ('Embedded Compact',NULL,'embebido',3,'Linux Embedded',4,3,1),
-	   ('HPC Titan',NULL,'cientifico',2,'Linux',6,7,8);
+       ('Workstation Pro',NULL,'workstation',2,'Windows 10 Pro',8,4,2),
+       ('Gaming Beast',NULL,'gaming',3,'Windows 11 Pro',9,7,8),
+       ('Gaming Lite',NULL,'gaming',2,'Windows 10',10,6,2),
+       ('Servidor Ultra',NULL,'servidor',2,'Windows Server 2019',6,7,2),
+       ('Embedded Compact',NULL,'embebido',3,'Linux Embedded',1,7,1),
+       ('HPC Titan',NULL,'cientifico',2,'Linux',6,8,8);
 INSERT INTO ord_cpu (CodOrd,CodCpu,CodRefCpu,Cantidad)
 VALUES (1,3,1,1),
        (2,1,2,1),
-	   (3,4,6,2),
-	   (4,4,9,1),
-	   (5,1,1,1),
-	   (6,4,6,1),
-	   (7,10,1,1),
-	   (8,6,9,1); 
+       (3,7,6,2),
+       (4,4,9,1),
+       (5,1,1,1),
+       (6,4,6,1),
+       (7,3,1,1),
+       (8,16,6,2);
 INSERT INTO ord_gpu (CodOrd,CodGpu,CodRefGpu,Cantidad)
 VALUES (1,10,13,1),
        (3,4,5,2),
@@ -561,32 +590,32 @@ VALUES (1,1,2),
 	   (7,4,1),
 	   (8,2,8);
 INSERT INTO ord_ram (CodOrd,CodRam,Cantidad)
-VALUES (1,1,2),
-	   (2,2,2),
-	   (3,2,4),
-	   (4,2,4),
-	   (5,2,2),
-	   (6,2,4),
-	   (7,2,1),
-	   (8,6,4);
+VALUES (1,13,2),
+       (2,2,2),
+       (3,4,8),
+       (4,13,4),
+       (5,2,2),
+       (6,13,4),
+       (7,13,1),
+       (8,4,8);
 INSERT INTO ord_fuen (CodOrd,CodFuen,Cantidad)
 VALUES (1,1,1),
        (2,2,1),
-	   (3,2,2),
-	   (4,2,1),
-	   (5,2,1),
-	   (6,3,1),
-	   (7,2,1),
-	   (8,4,1);  
+       (3,2,2),
+       (4,3,1),
+       (5,2,1),
+       (6,3,1),
+       (7,2,1),
+       (8,3,1);
 INSERT INTO ord_alm (CodOrd,CodAlmSecundario,Cantidad)
 VALUES (1,2,1),(1,3,1),
-	   (2,3,2),
-	   (3,3,1),(3,5,1),
-	   (4,3,1),(4,5,1),
-	   (5,3,1),
-	   (6,3,1),(6,4,1),
-	   (7,3,1),
-	   (8,10,1),(8,11,1);  
+       (2,3,2),
+       (3,3,1),(3,5,1),
+       (4,3,1),(4,5,1),
+       (5,3,1),
+       (6,3,1),(6,4,1),
+       (7,3,1),
+       (8,10,1),(8,9,1);
 INSERT INTO ordenador_PCOficina (MainSoft,CodOrd)
 VALUES ('Office Suite',1),
        ('Office Suite Pro',2);
@@ -602,13 +631,89 @@ VALUES (1,7);
 INSERT INTO ordenador_cientifico (multiCpu,CodOrd)  
 VALUES (1,8);
 
---Asignacion del precio de los ordenadores (suma de componentes + montaje + mantenimiento inicial)
-UPDATE ordenador
-SET Precio = (SELECT SUM(C.Precio) FROM ord_cpu OC JOIN cpu C ON (OC.CodCpu=C.CodCpu))
+--Inserción de montadores
+INSERT INTO montador (Nombre,Apellidos,DNI,FechaIni,Titulacion)  
+VALUES ('Juan','Pérez Gómez','12345678A','2025-03-20','Ingeniería en Sistemas'),  
+       ('Ana','López García','23456789B','2025-03-20','Técnico en Informática'),  
+       ('Carlos','Martínez Sánchez','34567890C','2025-03-20','Licenciado en Ciencias de la Computación'),  
+       ('Laura','Ramírez Torres','45678901D','2025-03-20','Grado en Ingeniería de Software'),  
+       ('Pedro','Fernández Rodríguez','56789012E','2025-03-20','Técnico en Desarrollo de Aplicaciones'),  
+       ('Sofía','González Pérez','67890123F','2025-03-20','Máster en Inteligencia Artificial'),  
+       ('Diego','Hernández Ruiz','78901234G','2025-03-20','Ingeniería en Redes de Comunicación'),  
+       ('Beatriz','Jiménez Morales','89012345H','2025-03-20','Grado en Matemáticas y Computación'),  
+       ('Fernando','Vázquez Díaz','90123456I','2025-03-20','Diplomado en Desarrollo Web'),  
+       ('María','Sánchez López','01234567J','2025-03-20','Máster en Ciberseguridad');
 
---añadir precio a todo + trigger para precio de ordenador
---añadir atributos de cantidad maxima de ram, cpus y (gpus) para placa base comprobando los datos de los ordenadores
---añadir triggers de insert y update que verifiquen que los datos introducidos al crear un ordenador sean compatibles
+--Inserción de los montajes
+INSERT INTO montaje (Detalles,Precio,CodOrd,CodMon)  
+VALUES ('El montaje fue fluido, sin inconvenientes. Se organizó el cableado y la ventilación para mejorar la circulación de aire.',DEFAULT,1,3),  
+       ('Se enfrentaron algunos problemas con la alineación del chasis, pero se resolvieron ajustando los soportes.',DEFAULT,2,5),  
+       ('El ensamblaje de la workstation tomó más tiempo debido a la complejidad del sistema de refrigeración.',DEFAULT,3,1),  
+       ('Montaje exitoso con optimización en la distribución de cables y colocación de la GPU sin interferencias.',DEFAULT,4,7),  
+       ('La estructura del equipo gaming permitió una instalación rápida y eficiente, sin necesidad de ajustes adicionales.',DEFAULT,5,4),  
+       ('El montaje del servidor requirió precisión en la conexión de múltiples unidades de almacenamiento.',DEFAULT,6,6),  
+       ('Se presentaron inconvenientes con la compatibilidad del chasis, pero se solucionaron adaptando los puntos de anclaje.',DEFAULT,7,3),  
+       ('El equipo HPC quedó ensamblado correctamente tras verificar la integración de los módulos de alto rendimiento.',DEFAULT,8,8);  
+
+--Inserción de servicios de testeo
+INSERT INTO servicioTesteo (Nombre,Estrellas)  
+VALUES ('TechCare Solutions',4.5),  
+       ('PC Master Repair',4.8),  
+       ('HardFix Express',4.2),  
+       ('Byte Savers',3.9),  
+       ('ReparaTech',4.6),  
+       ('Overclock Services',4.1),  
+       ('DataRescue Labs',4.7),  
+       ('Elite PC Support',4.3),  
+       ('Chipset Fixers',3.8),  
+       ('UltraTech Repairs',4.9);  
+
+--Inserció de los testeos
+INSERT INTO testeo (Precio,Fecha,Reporte,CodOrd,CodSerTest)  
+VALUES (DEFAULT,'2024-01-25','Se realizaron pruebas de estabilidad y rendimiento. Todo funciona correctamente.',4,3),  
+       (DEFAULT,DEFAULT,'Verificación de temperaturas y carga máxima. Sin anomalías detectadas.',1,5),  
+       (DEFAULT,'2018-05-23','Se ejecutaron benchmarks de CPU y GPU. Resultados dentro de lo esperado.',6,1),  
+       (DEFAULT,DEFAULT,'Comprobación de conexiones internas y sistema de refrigeración. Todo en orden.',3,7),  
+       (DEFAULT,'2022-12-31','Se verificó compatibilidad de drivers y estabilidad del sistema.',8,2),  
+       (DEFAULT,'2021-01-01','Test de estrés en múltiples aplicaciones. Rendimiento estable.',2,6),  
+       (DEFAULT,DEFAULT,'Se revisó integridad de los componentes y configuración de BIOS.',7,3),  
+       (DEFAULT,DEFAULT,'Análisis de voltajes y estabilidad energética. Sin fallos detectados.',5,1);  
+
+--Inserción de usuarios (administradores y normales)
+INSERT INTO usuario (Nombre,Ape1Usu,Ape2Usu,DNI,FecNac,DireccionCompleta,Correo,Contrasenia,EsAdministrador)
+VALUES ('Juan','Pérez',NULL,'12345678A','2005-03-21','Calle Ficticia 123','juan.perez@gmail.com','contrasena123',0),
+       ('Ana','López','García','23456789B','2004-07-12','Calle Real 456','ana.lopez@hotmail.com','contrasena456',0),
+       ('Carlos','Martínez',NULL,'34567890C','2001-09-15','Avenida Principal 789','carlos.martinez@gmail.com','contrasena789',0),
+       ('Laura','Ramírez','Torres','45678901D','2002-11-05','Plaza Mayor 101','laura.ramirez@yahoo.com','contrasena101',1),
+       ('Pedro','Fernández',NULL,'56789012E','1999-02-28','Calle Falsa 202','pedro.fernandez@hotmail.com','contrasena202',0),
+       ('Sofía','González','Pérez','67890123F','2003-04-10','Calle del Sol 303','sofia.gonzalez@gmail.com','contrasena303',1),
+       ('Diego','Hernández',NULL,'78901234G','2000-06-01','Calle del Río 404','diego.hernandez@gmail.com','contrasena404',0),
+       ('Beatriz','Jiménez','Morales','89012345H','2006-08-18','Avenida Libertad 505','beatriz.jimenez@hotmail.com','contrasena505',1),
+       ('Fernando','Vázquez','Díaz','90123456I','2000-12-15','Calle del Mar 606','fernando.vazquez@gmail.com','contrasena606',0),
+       ('María','Sánchez',NULL,'01234567J','2001-10-25','Avenida 25 707','maria.sanchez@yahoo.com','contrasena707',1);
+
+--Inserción de carritos
+INSERT INTO carrito (Fecha,PrecioTotal,Estado,CodUsu) 
+VALUES ('2025-03-15',NULL,'compraRealizada',2),
+       ('2025-03-18',NULL,'compraRealizada',5),
+       ('2025-03-20',NULL,'compraRealizada',6),
+       (DEFAULT,NULL,'compraRealizada',8);
+
+--Inserción de los contenidos de los carritos
+INSERT INTO contenido_carrito (Precio,Cantidad,CodCar,CodOrd,CodCha,CodFuen,CodPB,CodAlm,CodRam,CodGpu,CodCpu,CodVent,CodRefCpu,CodRefGpu)
+VALUES (NULL,1,1,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(NULL,5,1,NULL,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(NULL,8,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1),
+       (NULL,1,2,NULL,NULL,3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(NULL,1,2,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
+       (NULL,1,3,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL,NULL),(NULL,2,3,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL),(NULL,1,3,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL),
+       (NULL,1,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,3,NULL,NULL,NULL),(NULL,4,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL),(NULL,2,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL);
+       
+--Asignacion del precio de los ordenadores (suma de componentes + montaje + testeo inicial)
+
+--Asignación del precio a los contenidos de los carritos (producto asociado * cantidad del mismo en la orden)
+
+--Asignación del precio a los carritos (suma del precio de todas las entradas de contenido_carrito vinculadas al carrito)
+
+
+--trigger para precios
+--añadir triggers de insert y update que verifiquen que los datos introducidos al crear tablas sean compatibles (quizas, en java puede ser suficiente)
 --añadir comentarios
 --reglas de borrado en FKs
---revisar datos
