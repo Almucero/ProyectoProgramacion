@@ -1,3 +1,7 @@
+import java.sql.Connection;
+
+import connection.ConnectionPool;
+
 public class App {
     public static int menuPrincipal() {
         int opcion = 0;
@@ -72,7 +76,18 @@ public class App {
         System.out.flush();
     }
     public static void main(String[] args) throws Exception {
-        System.out.println("Hello, World!");
-        limpiarConsola();
+        // Configuración de la conexión a la base de datos
+        String url = "jdbc:mysql://localhost:3307/ProyectoProgramacionBBDDMySql";
+        String usuario = "a";
+        String clave = "root";
+
+        ConnectionPool pool = new ConnectionPool(url, usuario, clave);
+
+        Connection conn = pool.getConnection();
+
+        if (conn!=null) {
+            System.out.println("me cago en dios");
+        }
+        pool.closeAll();
     }
 }
