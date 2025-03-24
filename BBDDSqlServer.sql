@@ -707,11 +707,37 @@ VALUES (NULL,1,1,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(NULL,5,1,
        (NULL,1,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,3,NULL,NULL,NULL),(NULL,4,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL),(NULL,2,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL);
        
 --Asignacion del precio de los ordenadores (suma de componentes + montaje + testeo inicial)
+CREATE TRIGGER precioOrd 
+ON ordenador
+FOR INSERT, UPDATE
+AS
+BEGIN
+	UPDATE ordenador 
+	SET Precio = (SELECT Precio FROM chasis CH WHERE CH.CodCha=CodCha) + 
+	             (SELECT Precio FROM placaBase PB WHERE PB.CodPB=CodPB) +
+				 (SELECT Precio FROM almacenamiento ALM WHERE ALM.CodAlm=CodAlmPrincipal) +
+				 (SELECT Precio FROM cpu C JOIN ord_cpu OC ON (C.CodCpu=OC.CodCpu) JOIN ordenador ON (CodOrd=OC.CodOrd)) *
+					(SELECT Cantidad FROM ord_cpu OC WHERE OC.CodOrd=CodOrd) +
+				 (SELECT Precio FROM refrigeracionCpu
+END;
 
 --Asignación del precio a los contenidos de los carritos (producto asociado * cantidad del mismo en la orden)
+CREATE TRIGGER precioContCar 
+ON contenido_carrito
+ON ordenador
+FOR INSERT, UPDATE
+AS
+BEGIN
+END;
 
 --Asignación del precio a los carritos (suma del precio de todas las entradas de contenido_carrito vinculadas al carrito)
-
+CREATE TRIGGER precioCarrito 
+ON carrito
+ON ordenador
+FOR INSERT, UPDATE
+AS
+BEGIN
+END;
 
 --trigger para precios
 --añadir triggers de insert y update que verifiquen que los datos introducidos al crear tablas sean compatibles (quizas, en java puede ser suficiente)
