@@ -77,9 +77,9 @@ public class App {
     }
     public static void main(String[] args) throws Exception {
         // Configuración de la conexión a la base de datos
-        String url = "jdbc:mysql://localhost:3307/ProyectoProgramacionBBDDMySql";
-        String usuario = "a";
-        String clave = "root";
+        String url = "jdbc:sqlserver://localhost:1433;databaseName=ProyectoProgramacionSqlServer_12;encrypt=true;trustServerCertificate=true";
+        String usuario = "sa";
+        String clave = "12062006aB@";
 
         ConnectionPool pool = new ConnectionPool(url, usuario, clave);
 
@@ -87,6 +87,9 @@ public class App {
 
         if (conn!=null) {
             System.out.println("me cago en dios");
+        }
+        else {
+            System.out.println("me cago en dios parte 2");
         }
         pool.closeAll();
     }
