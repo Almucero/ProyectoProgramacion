@@ -1,8 +1,9 @@
-CREATE DATABASE ProyectoProgramacionSqlServer_12
+CREATE DATABASE ProyectoProgramacionSqlServer_25
 GO
-USE ProyectoProgramacionSqlServer_12
+USE ProyectoProgramacionSqlServer_25
 GO
 
+--Se establece el formato de la fecha en año-mes-dia, para evitar problemas al luego insertar datos
 SET DATEFORMAT 'YMD';
 
 --Creación de tablas
@@ -23,7 +24,7 @@ CREATE TABLE cpu
  Frecuencia FLOAT NOT NULL CHECK (Frecuencia BETWEEN 1 AND 10),
  CodFab INT NOT NULL FOREIGN KEY REFERENCES fabricante(CodFab)
 );
---en el caso de la refrigeración (aire o liquida), independientemente de si es de cpu o gpu, la mayoria de modelos deben de usarse en conjunto con
+--en el caso de la refrigeración (aire o liquida), independientemente de si es de cpu o gpu (liquida solo), la mayoria de modelos deben de usarse en conjunto con
 --ventiladores adicionales, para no complicar mucho más la cosa, esos ventiladores en el caso de ordenadores ya montados se incluirian en la tabla
 --de refrigeracion extra sin una relacion directa con la refrigeracion en cuestion y en conjunto con todos los ventiladores usados en el ordenador,
 --sin distincion. En el caaso de compra individual del producto, en este tienda se venderán las refrigeraciones sin ventiladores asociados
@@ -65,6 +66,7 @@ CREATE TABLE gpu
 --ventiladores a remover en caso de ser liquida)
 CREATE TABLE refrigeracionGpu
 (
+ Precio FLOAT NULL CHECK (Precio>=0), --en caso de ser por aire el precio es 0 (viene incluido con la gpu)
  CodRefGpu INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  Modelo VARCHAR(100) NOT NULL UNIQUE,
  Tipo VARCHAR(20) NOT NULL CHECK (Tipo IN ('aire(por defecto)','liquida')),
@@ -79,14 +81,13 @@ CREATE TABLE refrigeracionGpu_aire
 CREATE TABLE refrigeracionGpu_liquida
 (
  PotBomb FLOAT NOT NULL CHECK (PotBomb BETWEEN 1 AND 50),
- Precio FLOAT NOT NULL CHECK (Precio>0),
  Consumo FLOAT NOT NULL CHECK (Consumo>0),
  CodRefGpu INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu)
 );
 CREATE TABLE ventilador
 (
- CodVent INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  Precio FLOAT NOT NULL CHECK (Precio>0),
+ CodVent INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  Modelo VARCHAR(100) NOT NULL UNIQUE,
  Consumo FLOAT NOT NULL CHECK (Consumo>0),
  Velocidad FLOAT NOT NULL CHECK (Velocidad BETWEEN 0 AND 10000),
@@ -153,7 +154,7 @@ CREATE TABLE ordenador
 (
  CodOrd INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  Nombre VARCHAR(100) NOT NULL UNIQUE,
- Precio FLOAT NULL CHECK (Precio>0), --Se deja en null de momento, despues se actualizará con la suma de todos los precios asociados
+ Precio FLOAT NOT NULL CHECK (Precio>=0), --Se deja a 0 de momento, despues se actualizará con la suma de todos los precios asociados
  Proposito VARCHAR(15) NOT NULL CHECK (Proposito IN ('PC/Oficina','workstation','gaming','servidor','embebido','cientifico')),
  Stock INT NOT NULL CHECK (Stock>=0),
  SO VARCHAR(30) NOT NULL,
@@ -287,7 +288,7 @@ CREATE TABLE carrito
 (
  CodCar INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  Fecha DATE NOT NULL DEFAULT GETDATE(),
- PrecioTotal FLOAT NULL CHECK (PrecioTotal>0), --Se deja a null y luego se cambia en base a las diferentes entradas en contenido_carrito
+ PrecioTotal FLOAT NULL CHECK (PrecioTotal>=0), --Se deja a 0 y luego se cambia en base a las diferentes entradas en contenido_carrito
  Estado VARCHAR(50) NOT NULL CHECK (Estado IN ('compraRealizada','compraNoRealizada')) DEFAULT 'compraNoRealizada',
  CodUsu INT NOT NULL FOREIGN KEY REFERENCES usuario(CodUsu)
 );
@@ -296,7 +297,7 @@ CREATE TABLE carrito
 CREATE TABLE contenido_carrito
 (
  CodConCar INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
- Precio FLOAT NULL CHECK (Precio>0), --se deja a null y luega se actualiza en base a la cantidad
+ Precio FLOAT NOT NULL CHECK (Precio>=0), --se deja a 0 y luega se actualiza en base a la cantidad
  Cantidad INT NOT NULL CHECK (Cantidad>0),
  CodCar INT NOT NULL FOREIGN KEY REFERENCES carrito(CodCar),
  CodOrd INT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
@@ -312,8 +313,10 @@ CREATE TABLE contenido_carrito
  CodRefGpu INT NULL FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu)
 );
 
+GO
+
 --Inserción de datos iniciales (todas las verificaciones de logica interna, ej: que el socket de la cpu sea compatible
---con la placa base, o que no haya más de un carrito en estado de "compraNoRealizada"; se realizará desde Java y no aqui, 
+--con la placa base a instalar en un ordenador, o que no haya más de un carrito en estado de "compraNoRealizada"; se realizará desde Java y no aqui, 
 --los ordenadores preemontados iniciales que se agregarán cumpliran ya con todas las restricciones
 INSERT INTO fabricante (NomFab)
 VALUES ('Corsair'),
@@ -400,20 +403,20 @@ VALUES (300,'NVIDIA GeForce RTX 3060',10,12,1.78,'GDDR6',170,17),
        (300,'AMD Radeon RX 5700',10,8,1.73,'GDDR6',225,13),  
        (2500,'NVIDIA Titan RTX',4,24,1.77,'GDDR6',280,17),  
        (150,'NVIDIA GeForce GTX 1050 Ti',12,4,1.39,'GDDR5',75,17);
-INSERT INTO refrigeracionGpu (Modelo,Tipo,Stock,CodFab)  
-VALUES ('Refrigeración por defecto con aire de NVIDIA GeForce RTX 3060','aire(por defecto)',10,17),  
-       ('Refrigeración por defecto con aire de NVIDIA GeForce RTX 3080','aire(por defecto)',5,17),  
-       ('Refrigeración por defecto con aire de AMD Radeon RX 6700 XT','aire(por defecto)',8,13),  
-       ('Refrigeración líquida Corsair iCUE H150i Elite Capellix','liquida',2,1),  
-       ('Refrigeración por defecto con aire de NVIDIA GeForce RTX 4090','aire(por defecto)',3,17),  
-       ('Refrigeración líquida NZXT Kraken Z63','liquida',7,5),  
-       ('Refrigeración por defecto con aire de AMD Radeon RX 6800 XT','aire(por defecto)',10,13),  
-       ('Refrigeración líquida ASUS ROG Strix LC 360','liquida',4,2),  
-       ('Refrigeración por defecto con aire de NVIDIA Quadro RTX 8000','aire(por defecto)',3,17),  
-       ('Refrigeración por defecto con aire de NVIDIA GeForce GTX 1650','aire(por defecto)',15,17),
-       ('Refrigeración por defecto con aire de AMD Radeon RX 5700','aire(por defecto)',4,13),
-	   ('Refrigeración por defecto con aire de NVIDIA Titan RTX','aire(por defecto)',7,17),
-       ('Refrigeración por defecto con aire de NVIDIA GeForce GTX 1050 Ti','aire(por defecto)',23,17);
+INSERT INTO refrigeracionGpu (Precio,Modelo,Tipo,Stock,CodFab)  
+VALUES (0,'Refrigeración por defecto con aire de NVIDIA GeForce RTX 3060','aire(por defecto)',10,17),  
+       (0,'Refrigeración por defecto con aire de NVIDIA GeForce RTX 3080','aire(por defecto)',5,17),  
+       (0,'Refrigeración por defecto con aire de AMD Radeon RX 6700 XT','aire(por defecto)',8,13),  
+       (200,'Refrigeración líquida Corsair iCUE H150i Elite Capellix','liquida',2,1),  
+       (0,'Refrigeración por defecto con aire de NVIDIA GeForce RTX 4090','aire(por defecto)',3,17),  
+       (180,'Refrigeración líquida NZXT Kraken Z63','liquida',7,5),  
+       (0,'Refrigeración por defecto con aire de AMD Radeon RX 6800 XT','aire(por defecto)',10,13),  
+       (220,'Refrigeración líquida ASUS ROG Strix LC 360','liquida',4,2),  
+       (0,'Refrigeración por defecto con aire de NVIDIA Quadro RTX 8000','aire(por defecto)',3,17),  
+       (0,'Refrigeración por defecto con aire de NVIDIA GeForce GTX 1650','aire(por defecto)',15,17),
+       (0,'Refrigeración por defecto con aire de AMD Radeon RX 5700','aire(por defecto)',4,13),
+	   (0,'Refrigeración por defecto con aire de NVIDIA Titan RTX','aire(por defecto)',7,17),
+       (0,'Refrigeración por defecto con aire de NVIDIA GeForce GTX 1050 Ti','aire(por defecto)',23,17);
 INSERT INTO refrigeracionGpu_aire (Velocidad,CodRefGpu)  
 VALUES (2500,1),  
        (2500,2),  
@@ -425,10 +428,10 @@ VALUES (2500,1),
        (2500,11),  
        (2500,12),  
        (2500,13);
-INSERT INTO refrigeracionGpu_liquida (Precio,PotBomb,Consumo,CodRefGpu)  
-VALUES (200,25,50,4),  
-       (180,25,50,6),  
-       (220,25,50,8);
+INSERT INTO refrigeracionGpu_liquida (PotBomb,Consumo,CodRefGpu)  
+VALUES (25,50,4),  
+       (25,50,6),  
+       (25,50,8);
 INSERT INTO ventilador (Precio,Modelo,Consumo,Velocidad,Stock,CodFab)  
 VALUES (25,'Ventilador Noctua NF-A12x25 PWM',0.6,2000,10,18),  
        (28,'Ventilador Corsair ML120 PRO',0.4,2400,5,1),  
@@ -501,16 +504,244 @@ VALUES (400,4,1,3,'DDR4','ATX',30,'X570','AM4','ASUS ROG Crosshair VIII Hero',2)
        (220,4,1,2,'DDR4','ATX',15,'B550','AM4','MSI MPG B550 Gaming Edge WiFi',3),  
        (270,2,1,1,'DDR4','Mini ITX',12,'Z590','LGA1200','ASRock Z590 Phantom Gaming-ITX/TB3',33);
 
---Insercion de ordenadores preemontados con componentes compatibles
+GO
+
+--Creación del procedimiento que actualizará el precio de los ordenadores en base a los componentes que este tenga + montaje + testeo, conforme se vayan añadiendo/modificando/borrando datos
+CREATE PROCEDURE recalculaPrecioTotal (@CodOrd INT)
+AS
+BEGIN
+  UPDATE o
+  SET o.Precio =
+       ISNULL((SELECT c.Precio FROM chasis c WHERE c.CodCha = o.CodCha), 0) +
+       ISNULL((SELECT pb.Precio FROM placaBase pb WHERE pb.CodPB = o.CodPB), 0) +
+       ISNULL((SELECT a.Precio FROM almacenamiento a WHERE a.CodAlm = o.CodAlmPrincipal), 0) +
+       ISNULL((SELECT SUM((cpu.Precio + refcpu.Precio) * oc.Cantidad)
+                FROM ord_cpu oc
+                JOIN cpu ON cpu.CodCpu = oc.CodCpu
+                JOIN refrigeracionCpu refcpu ON refcpu.CodRefCpu = oc.CodRefCpu
+                WHERE oc.CodOrd = o.CodOrd), 0) +
+       ISNULL((SELECT SUM((g.Precio + refgpu.Precio) * og.Cantidad)
+                FROM ord_gpu og
+                JOIN gpu g ON g.CodGpu = og.CodGpu
+                JOIN refrigeracionGpu refgpu ON refgpu.CodRefGpu = og.CodRefGpu
+                WHERE og.CodOrd = o.CodOrd), 0) +
+       ISNULL((SELECT SUM(v.Precio * ov.Cantidad)
+                FROM ord_vent ov
+                JOIN ventilador v ON v.CodVent = ov.CodVent
+                WHERE ov.CodOrd = o.CodOrd), 0) +
+       ISNULL((SELECT SUM(r.Precio * oram.Cantidad)
+                FROM ord_ram oram
+                JOIN ram r ON r.CodRam = oram.CodRam
+                WHERE oram.CodOrd = o.CodOrd), 0) +
+       ISNULL((SELECT SUM(f.Precio * ofu.Cantidad)
+                FROM ord_fuen ofu
+                JOIN fuente f ON f.CodFuen = ofu.CodFuen
+                WHERE ofu.CodOrd = o.CodOrd), 0) +
+       ISNULL((SELECT SUM(a2.Precio * oa.Cantidad)
+                FROM ord_alm oa
+                JOIN almacenamiento a2 ON a2.CodAlm = oa.CodAlmSecundario
+                WHERE oa.CodOrd = o.CodOrd), 0) +
+       ISNULL((SELECT SUM(m.Precio)
+                FROM montaje m
+                WHERE m.CodOrd = o.CodOrd), 0) +
+       ISNULL((SELECT SUM(t.Precio)
+                FROM testeo t
+                WHERE t.CodOrd = o.CodOrd), 0)
+  FROM ordenador o
+  WHERE o.CodOrd = @CodOrd;
+END;
+GO
+
+--Trigger para capturar inserciones, actualizaciones o borrados en la tabla "ordenador" y actualizar su precio total
+CREATE TRIGGER trg_ord
+ON ordenador
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Trigger para capturar inserciones, actualizaciones o borrados en la tabla "ord_cpu" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_ord_cpu
+ON ord_cpu
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Trigger para capturar inserciones, actualizaciones o borrados en la tabla "ord_gpu" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_ord_gpu
+ON ord_gpu
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Trigger para capturar inserciones, actualizaciones o borrados en la tabla "ord_vent" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_ord_vent
+ON ord_vent
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Trigger para capturar inserciones, actualizaciones o borrados en la tabla "ord_ram" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_ord_ram
+ON ord_ram
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Trigger para capturar inserciones, actualizaciones o borrados en la tabla "ord_fuen" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_ord_fuen
+ON ord_fuen
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Trigger para capturar inserciones, actualizaciones o borrados en la tabla "ord_alm" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_ord_alm
+ON ord_alm
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Trigger para capturar inserciones en la tabla "montaje" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_montaje
+ON montaje
+AFTER INSERT
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM inserted;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Trigger para capturar inserciones en la tabla "testeo" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_testeo
+ON testeo
+AFTER INSERT
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM inserted;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Insercion de ordenadores preemontados con componentes compatibles y precios auto-asignados con los triggers creados (se dejan a 0)
 INSERT INTO ordenador (Nombre,Precio,Proposito,Stock,SO,CodCha,CodPB,CodAlmPrincipal)
-VALUES ('Oficina Pro Max',NULL,'PC/Oficina',5,'Windows 11',1,7,1),
-       ('Oficina Pro',NULL,'PC/Oficina',4,'Windows 10',4,6,2),
-       ('Workstation Pro',NULL,'workstation',2,'Windows 10 Pro',8,4,2),
-       ('Gaming Beast',NULL,'gaming',3,'Windows 11 Pro',9,7,8),
-       ('Gaming Lite',NULL,'gaming',2,'Windows 10',10,6,2),
-       ('Servidor Ultra',NULL,'servidor',2,'Windows Server 2019',6,7,2),
-       ('Embedded Compact',NULL,'embebido',3,'Linux Embedded',1,7,1),
-       ('HPC Titan',NULL,'cientifico',2,'Linux',6,8,8);
+VALUES ('Oficina Pro Max',0,'PC/Oficina',5,'Windows 11',1,7,1),
+       ('Oficina Pro',0,'PC/Oficina',4,'Windows 10',4,6,2),
+       ('Workstation Pro',0,'workstation',2,'Windows 10 Pro',8,4,2),
+       ('Gaming Beast',0,'gaming',3,'Windows 11 Pro',9,7,8),
+       ('Gaming Lite',0,'gaming',2,'Windows 10',10,6,2),
+       ('Servidor Ultra',0,'servidor',2,'Windows Server 2019',6,7,2),
+       ('Embedded Compact',0,'embebido',3,'Linux Embedded',1,7,1),
+       ('HPC Titan',0,'cientifico',2,'Linux',6,8,8);
 INSERT INTO ord_cpu (CodOrd,CodCpu,CodRefCpu,Cantidad)
 VALUES (1,3,1,1),
        (2,1,2,1),
@@ -641,34 +872,19 @@ VALUES ('Juan','Pérez',NULL,'12345678A','2005-03-21','Calle Ficticia 123','juan.
 
 --Inserción de carritos
 INSERT INTO carrito (Fecha,PrecioTotal,Estado,CodUsu) 
-VALUES ('2025-03-15',NULL,'compraRealizada',2),
-       ('2025-03-18',NULL,'compraRealizada',5),
-       ('2025-03-20',NULL,'compraRealizada',6),
-       (DEFAULT,NULL,'compraRealizada',8);
+VALUES ('2025-03-15',0,'compraRealizada',2),
+       ('2025-03-18',0,'compraRealizada',5),
+       ('2025-03-20',0,'compraRealizada',6),
+       (DEFAULT,0,'compraRealizada',8);
 
 --Inserción de los contenidos de los carritos
 INSERT INTO contenido_carrito (Precio,Cantidad,CodCar,CodOrd,CodCha,CodFuen,CodPB,CodAlm,CodRam,CodGpu,CodCpu,CodVent,CodRefCpu,CodRefGpu)
-VALUES (NULL,1,1,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(NULL,5,1,NULL,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(NULL,8,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1),
-       (NULL,1,2,NULL,NULL,3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(NULL,1,2,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
-       (NULL,1,3,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL,NULL),(NULL,2,3,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL),(NULL,1,3,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL),
-       (NULL,1,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,3,NULL,NULL,NULL),(NULL,4,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL),(NULL,2,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL);
+VALUES (0,1,1,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(0,5,1,NULL,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(0,8,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1),
+       (0,1,2,NULL,NULL,3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(0,1,2,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
+       (0,1,3,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL,NULL),(0,2,3,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL),(0,1,3,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL),
+       (0,1,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,3,NULL,NULL,NULL),(0,4,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL),(0,2,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL);
        
 /*
-
---Asignacion del precio de los ordenadores (suma de componentes + montaje + testeo inicial)
-CREATE TRIGGER precioOrd 
-ON ordenador
-FOR INSERT, UPDATE
-AS
-BEGIN
-	UPDATE ordenador 
-	SET Precio = (SELECT Precio FROM chasis CH WHERE CH.CodCha=CodCha) + 
-	             (SELECT Precio FROM placaBase PB WHERE PB.CodPB=CodPB) +
-				 (SELECT Precio FROM almacenamiento ALM WHERE ALM.CodAlm=CodAlmPrincipal) +
-				 (SELECT Precio FROM cpu C JOIN ord_cpu OC ON (C.CodCpu=OC.CodCpu) JOIN ordenador ON (CodOrd=OC.CodOrd)) *
-					(SELECT Cantidad FROM ord_cpu OC WHERE OC.CodOrd=CodOrd) +
-				 (SELECT Precio FROM refrigeracionCpu
-END;
 
 --Asignación del precio a los contenidos de los carritos (producto asociado * cantidad del mismo en la orden)
 CREATE TRIGGER precioContCar 
