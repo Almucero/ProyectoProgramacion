@@ -1,13 +1,13 @@
-CREATE DATABASE ProyectoProgramacionSqlServer_25
+CREATE DATABASE ProyectoProgramacionSqlServer_28
 GO
-USE ProyectoProgramacionSqlServer_25
+USE ProyectoProgramacionSqlServer_28
 GO
 
 --Se establece el formato de la fecha en año-mes-dia, para evitar problemas al luego insertar datos
 SET DATEFORMAT 'YMD';
 
 --Creación de tablas
-CREATE TABLE fabricante
+CREATE TABLE fabricante --Si se borra un fabricante, los productos que este tuviese se quedan en la bbdd, pero su fabricante sera null
 (
  CodFab INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  NomFab VARCHAR(100) NOT NULL
@@ -22,7 +22,7 @@ CREATE TABLE cpu
  Nucleos INT NOT NULL CHECK (Nucleos BETWEEN 1 AND 256),
  Socket VARCHAR(50) NOT NULL,
  Frecuencia FLOAT NOT NULL CHECK (Frecuencia BETWEEN 1 AND 10),
- CodFab INT NOT NULL FOREIGN KEY REFERENCES fabricante(CodFab)
+ CodFab INT NULL FOREIGN KEY REFERENCES fabricante(CodFab) ON DELETE SET NULL ON UPDATE CASCADE
 );
 --en el caso de la refrigeración (aire o liquida), independientemente de si es de cpu o gpu (liquida solo), la mayoria de modelos deben de usarse en conjunto con
 --ventiladores adicionales, para no complicar mucho más la cosa, esos ventiladores en el caso de ordenadores ya montados se incluirian en la tabla
@@ -36,17 +36,17 @@ CREATE TABLE refrigeracionCpu
  Consumo FLOAT NOT NULL CHECK (Consumo>0),
  Tipo VARCHAR(7) NOT NULL CHECK (Tipo IN ('aire','liquida')),
  Stock INT NOT NULL CHECK (Stock>=0),
- CodFab INT NOT NULL FOREIGN KEY REFERENCES fabricante(CodFab)
+ CodFab INT NULL FOREIGN KEY REFERENCES fabricante(CodFab) ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE TABLE refrigeracionCpu_aire
 (
  Velocidad FLOAT NULL CHECK (Velocidad BETWEEN 0 AND 10000), --puede ser nulo si no tiene ventilador propio y depende de uno montable
- CodRefCpu INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES refrigeracionCpu(CodRefCpu)
+ CodRefCpu INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES refrigeracionCpu(CodRefCpu) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE refrigeracionCpu_liquida
 (
  PotBomb FLOAT NOT NULL CHECK (PotBomb BETWEEN 1 AND 50),
- CodRefCpu INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES refrigeracionCpu(CodRefCpu)
+ CodRefCpu INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES refrigeracionCpu(CodRefCpu) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE gpu
 (
@@ -58,7 +58,7 @@ CREATE TABLE gpu
  Frecuencia FLOAT NOT NULL CHECK (Frecuencia>0),
  TipoMem VARCHAR(10) NOT NULL CHECK (TipoMem IN ('GDDR5','GDDR6','GDDR6X','GDDR7','HBM','HBM2','HBM3')),
  Consumo FLOAT NOT NULL CHECK (Consumo>0),
- CodFab INT NOT NULL FOREIGN KEY REFERENCES fabricante(CodFab)
+ CodFab INT NULL FOREIGN KEY REFERENCES fabricante(CodFab) ON DELETE SET NULL ON UPDATE CASCADE
 );
 --en la siguiente tabla el nombre del modelo será, en caso de por aire: refrigeración por defecto con aire de (nombre gpu),
 --y en el caso de ser liquida se especificaría el modelo concreto ahora sí. También, solo tendrá atributo consumo en caso
@@ -71,18 +71,18 @@ CREATE TABLE refrigeracionGpu
  Modelo VARCHAR(100) NOT NULL UNIQUE,
  Tipo VARCHAR(20) NOT NULL CHECK (Tipo IN ('aire(por defecto)','liquida')),
  Stock INT NOT NULL CHECK (Stock>=0),
- CodFab INT NOT NULL FOREIGN KEY REFERENCES fabricante(CodFab)
+ CodFab INT NULL FOREIGN KEY REFERENCES fabricante(CodFab) ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE TABLE refrigeracionGpu_aire
 (
  Velocidad FLOAT NOT NULL CHECK (Velocidad BETWEEN 1 AND 10000),
- CodRefGpu INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu)
+ CodRefGpu INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE refrigeracionGpu_liquida
 (
  PotBomb FLOAT NOT NULL CHECK (PotBomb BETWEEN 1 AND 50),
  Consumo FLOAT NOT NULL CHECK (Consumo>0),
- CodRefGpu INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu)
+ CodRefGpu INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE ventilador
 (
@@ -92,7 +92,7 @@ CREATE TABLE ventilador
  Consumo FLOAT NOT NULL CHECK (Consumo>0),
  Velocidad FLOAT NOT NULL CHECK (Velocidad BETWEEN 0 AND 10000),
  Stock INT NOT NULL CHECK (Stock>=0),
- CodFab INT NOT NULL FOREIGN KEY REFERENCES fabricante(CodFab)
+ CodFab INT NULL FOREIGN KEY REFERENCES fabricante(CodFab) ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE TABLE ram
 (
@@ -103,7 +103,7 @@ CREATE TABLE ram
  Tipo VARCHAR(10) NOT NULL CHECK (Tipo IN ('DDR','DDR2','DDR3','DDR4','DDR5')),
  Consumo FLOAT NOT NULL CHECK (Consumo>0),
  Stock INT NOT NULL CHECK (Stock>=0),
- CodFab INT NOT NULL FOREIGN KEY REFERENCES fabricante(CodFab)
+ CodFab INT NULL FOREIGN KEY REFERENCES fabricante(CodFab) ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE TABLE almacenamiento
 (
@@ -113,7 +113,7 @@ CREATE TABLE almacenamiento
  Capacidad FLOAT NOT NULL CHECK (Capacidad BETWEEN 1 AND 10000),
  Consumo FLOAT NOT NULL CHECK (Consumo>0),
  Stock INT NOT NULL CHECK (Stock>=0),
- CodFab INT NOT NULL FOREIGN KEY REFERENCES fabricante(CodFab)
+ CodFab INT NULL FOREIGN KEY REFERENCES fabricante(CodFab) ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE TABLE fuente
 (
@@ -123,7 +123,7 @@ CREATE TABLE fuente
  Stock INT NOT NULL CHECK (Stock>=0),
  Potencia FLOAT NOT NULL CHECK (Potencia BETWEEN 100 AND 2000),
  Eficiencia FLOAT NOT NULL CHECK (Eficiencia BETWEEN 0.5 AND 1),
- CodFab INT NOT NULL FOREIGN KEY REFERENCES fabricante(CodFab)
+ CodFab INT NULL FOREIGN KEY REFERENCES fabricante(CodFab) ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE TABLE chasis
 (
@@ -133,7 +133,7 @@ CREATE TABLE chasis
  Color VARCHAR(40) NOT NULL,
  Stock INT NOT NULL CHECK (Stock>=0),
  Tamanio VARCHAR(50) CHECK (Tamanio IN ('Mini','Micro','Mid','Full Tower','E-ATX')),
- CodFab INT NOT NULL FOREIGN KEY REFERENCES fabricante(CodFab)
+ CodFab INT NULL FOREIGN KEY REFERENCES fabricante(CodFab) ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE TABLE placaBase
 (
@@ -148,7 +148,7 @@ CREATE TABLE placaBase
  Chipset VARCHAR(50) NOT NULL,
  Socket VARCHAR(50) NOT NULL CHECK (Socket IN ('AM4','AM5','LGA1200','LGA1700','LGA1851','sTRX4','sTR5','SP3','LGA4189','ARM','Apple M4','LGA2066')),
  Modelo VARCHAR(100) NOT NULL UNIQUE,
- CodFab INT NOT NULL FOREIGN KEY REFERENCES fabricante(CodFab)
+ CodFab INT NULL FOREIGN KEY REFERENCES fabricante(CodFab) ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE TABLE ordenador
 (
@@ -158,85 +158,86 @@ CREATE TABLE ordenador
  Proposito VARCHAR(15) NOT NULL CHECK (Proposito IN ('PC/Oficina','workstation','gaming','servidor','embebido','cientifico')),
  Stock INT NOT NULL CHECK (Stock>=0),
  SO VARCHAR(30) NOT NULL,
- CodCha INT NOT NULL FOREIGN KEY REFERENCES chasis(CodCha),
- CodPB INT NOT NULL FOREIGN KEY REFERENCES placaBase(CodPB),
- CodAlmPrincipal INT NOT NULL FOREIGN KEY REFERENCES almacenamiento(CodAlm)
+ --Si se elimina alguno de los 3 elementos siguientes, el ordenador entero se borra, para evitar tener almacenados ordenadores con componentes faltantes
+ CodCha INT NOT NULL FOREIGN KEY REFERENCES chasis(CodCha) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodPB INT NOT NULL FOREIGN KEY REFERENCES placaBase(CodPB) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodAlmPrincipal INT NOT NULL FOREIGN KEY REFERENCES almacenamiento(CodAlm) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE ord_cpu
 (
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
- CodCpu INT NOT NULL FOREIGN KEY REFERENCES cpu(CodCpu),
- CodRefCpu INT NOT NULL FOREIGN KEY REFERENCES refrigeracionCpu(CodRefCpu),
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodCpu INT NOT NULL FOREIGN KEY REFERENCES cpu(CodCpu) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodRefCpu INT NOT NULL FOREIGN KEY REFERENCES refrigeracionCpu(CodRefCpu) ON DELETE CASCADE ON UPDATE CASCADE,
  Cantidad INT NOT NULL CHECK (Cantidad>0),
  PRIMARY KEY (CodOrd, CodCpu, CodRefCpu)
 );
 CREATE TABLE ord_gpu
 (
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
- CodGpu INT NOT NULL FOREIGN KEY REFERENCES gpu(CodGpu),
- CodRefGpu INT NOT NULL FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu),
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodGpu INT NOT NULL FOREIGN KEY REFERENCES gpu(CodGpu) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodRefGpu INT NOT NULL FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu) ON DELETE CASCADE ON UPDATE CASCADE,
  Cantidad INT NOT NULL CHECK (Cantidad>0),
  PRIMARY KEY (CodOrd, CodGpu, CodRefGpu)
 );
 CREATE TABLE ord_vent
 (
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
- CodVent INT NOT NULL FOREIGN KEY REFERENCES ventilador(CodVent),
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodVent INT NOT NULL FOREIGN KEY REFERENCES ventilador(CodVent) ON DELETE CASCADE ON UPDATE CASCADE,
  Cantidad INT NOT NULL CHECK (Cantidad>0),
  PRIMARY KEY (CodOrd, CodVent)
 );
 CREATE TABLE ord_ram
 (
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
- CodRam INT NOT NULL FOREIGN KEY REFERENCES ram(CodRam),
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodRam INT NOT NULL FOREIGN KEY REFERENCES ram(CodRam) ON DELETE CASCADE ON UPDATE CASCADE,
  Cantidad INT NOT NULL CHECK (Cantidad>0),
  PRIMARY KEY (CodOrd, CodRam)
 );
 CREATE TABLE ord_fuen
 (
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
- CodFuen INT NOT NULL FOREIGN KEY REFERENCES fuente(CodFuen),
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodFuen INT NOT NULL FOREIGN KEY REFERENCES fuente(CodFuen) ON DELETE CASCADE ON UPDATE CASCADE,
  Cantidad INT NOT NULL CHECK (Cantidad>0),
  PRIMARY KEY (CodOrd, CodFuen)
 );
 CREATE TABLE ord_alm
 (
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
- CodAlmSecundario INT NOT NULL FOREIGN KEY REFERENCES almacenamiento(CodAlm),
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodAlmSecundario INT NOT NULL FOREIGN KEY REFERENCES almacenamiento(CodAlm) ON DELETE CASCADE ON UPDATE CASCADE,
  Cantidad INT NOT NULL CHECK (Cantidad>0),
  PRIMARY KEY (CodOrd, CodAlmSecundario)
 );
 CREATE TABLE ordenador_PCOficina
 (
  MainSoft VARCHAR(200) NOT NULL,
- CodOrd INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES ordenador(CodOrd)
+ CodOrd INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE ordenador_workstation
 (
  render TINYINT NOT NULL,
  certificado VARCHAR(100) NULL,
- CodOrd INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES ordenador(CodOrd)
+ CodOrd INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE ordenador_gaming
 (
  RGB TINYINT NOT NULL,
  OC TINYINT NOT NULL,
- CodOrd INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES ordenador(CodOrd)
+ CodOrd INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE ordenador_servidor
 (
  escalabilidad VARCHAR(5) NOT NULL CHECK (escalabilidad IN ('alta','media','baja')),
- CodOrd INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES ordenador(CodOrd)
+ CodOrd INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE ordenador_embebido
 (
  SisTiemReal TINYINT NOT NULL,
- CodOrd INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES ordenador(CodOrd)
+ CodOrd INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE ordenador_cientifico
 (
  multiCpu TINYINT NOT NULL,
- CodOrd INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES ordenador(CodOrd)
+ CodOrd INT NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE montador
 (
@@ -253,8 +254,8 @@ CREATE TABLE montaje
  Fecha DATE NOT NULL DEFAULT GETDATE(),
  Detalles VARCHAR(500) NOT NULL,
  Precio FLOAT NOT NULL DEFAULT 250,
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
- CodMon INT NOT NULL FOREIGN KEY REFERENCES montador(CodMon)
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodMon INT NOT NULL FOREIGN KEY REFERENCES montador(CodMon) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE servicioTesteo
 (
@@ -268,8 +269,8 @@ CREATE TABLE testeo
  Precio FLOAT NOT NULL DEFAULT 50,
  Fecha DATE NOT NULL DEFAULT GETDATE(),
  Reporte VARCHAR(500) NOT NULL,
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
- CodSerTest INT NOT NULL FOREIGN KEY REFERENCES servicioTesteo(CodSerTest)
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodSerTest INT NOT NULL FOREIGN KEY REFERENCES servicioTesteo(CodSerTest) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE usuario
 (
@@ -290,7 +291,7 @@ CREATE TABLE carrito
  Fecha DATE NOT NULL DEFAULT GETDATE(),
  PrecioTotal FLOAT NULL CHECK (PrecioTotal>=0), --Se deja a 0 y luego se cambia en base a las diferentes entradas en contenido_carrito
  Estado VARCHAR(50) NOT NULL CHECK (Estado IN ('compraRealizada','compraNoRealizada')) DEFAULT 'compraNoRealizada',
- CodUsu INT NOT NULL FOREIGN KEY REFERENCES usuario(CodUsu)
+ CodUsu INT NOT NULL FOREIGN KEY REFERENCES usuario(CodUsu) ON DELETE CASCADE ON UPDATE CASCADE
 );
 --Esta tabla solo puede albercar un producto a la vez (en la cantidad que sea), hace referencia a una entrada de un carrito, 
 --un carrito completo estará asociado a 1 o muchas entradas de esta tabla
@@ -299,18 +300,18 @@ CREATE TABLE contenido_carrito
  CodConCar INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  Precio FLOAT NOT NULL CHECK (Precio>=0), --se deja a 0 y luega se actualiza en base a la cantidad
  Cantidad INT NOT NULL CHECK (Cantidad>0),
- CodCar INT NOT NULL FOREIGN KEY REFERENCES carrito(CodCar),
- CodOrd INT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
- CodCha INT NULL FOREIGN KEY REFERENCES chasis(CodCha),
- CodFuen INT NULL FOREIGN KEY REFERENCES fuente(CodFuen),
- CodPB INT NULL FOREIGN KEY REFERENCES placaBase(CodPB),
- CodAlm INT NULL FOREIGN KEY REFERENCES almacenamiento(CodAlm),
- CodRam INT NULL FOREIGN KEY REFERENCES ram(CodRam),
- CodGpu INT NULL FOREIGN KEY REFERENCES gpu(CodGpu),
- CodCpu INT NULL FOREIGN KEY REFERENCES cpu(CodCpu),
- CodVent INT NULL FOREIGN KEY REFERENCES ventilador(CodVent),
- CodRefCpu INT NULL FOREIGN KEY REFERENCES refrigeracionCpu(CodRefCpu),
- CodRefGpu INT NULL FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu)
+ CodCar INT NOT NULL FOREIGN KEY REFERENCES carrito(CodCar) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodOrd INT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodCha INT NULL FOREIGN KEY REFERENCES chasis(CodCha) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodFuen INT NULL FOREIGN KEY REFERENCES fuente(CodFuen) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodPB INT NULL FOREIGN KEY REFERENCES placaBase(CodPB) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodAlm INT NULL FOREIGN KEY REFERENCES almacenamiento(CodAlm) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodRam INT NULL FOREIGN KEY REFERENCES ram(CodRam) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodGpu INT NULL FOREIGN KEY REFERENCES gpu(CodGpu) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodCpu INT NULL FOREIGN KEY REFERENCES cpu(CodCpu) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodVent INT NULL FOREIGN KEY REFERENCES ventilador(CodVent) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodRefCpu INT NULL FOREIGN KEY REFERENCES refrigeracionCpu(CodRefCpu) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodRefGpu INT NULL FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 GO
@@ -506,7 +507,8 @@ VALUES (400,4,1,3,'DDR4','ATX',30,'X570','AM4','ASUS ROG Crosshair VIII Hero',2)
 
 GO
 
---Creación del procedimiento que actualizará el precio de los ordenadores en base a los componentes que este tenga + montaje + testeo, conforme se vayan añadiendo/modificando/borrando datos
+--Creación del procedimiento que actualizará el precio de los ordenadores en base a los componentes que este tenga + montaje + testeo, 
+--conforme se vayan añadiendo/modificando/borrando datos
 CREATE PROCEDURE recalculaPrecioTotal (@CodOrd INT)
 AS
 BEGIN
@@ -870,6 +872,42 @@ VALUES ('Juan','Pérez',NULL,'12345678A','2005-03-21','Calle Ficticia 123','juan.
        ('Fernando','Vázquez','Díaz','90123456I','2000-12-15','Calle del Mar 606','fernando.vazquez@gmail.com','contrasena606',0),
        ('María','Sánchez',NULL,'01234567J','2001-10-25','Avenida 25 707','maria.sanchez@yahoo.com','contrasena707',1);
 
+GO
+
+--Trigger para actualizar precios en "contenido_carrito" y "carrito"
+CREATE TRIGGER trg_actualiza_carrito
+ON contenido_carrito
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+  --Almacena los carritos afectados en una tabla variable
+  DECLARE @Carritos TABLE (CodCar INT);
+  INSERT INTO @Carritos (CodCar) SELECT CodCar FROM inserted UNION SELECT CodCar FROM deleted;
+  --Actualiza el precio de cada entrada en contenido_carrito para los carritos afectados
+  UPDATE cc
+  SET cc.Precio = cc.Cantidad *
+      (CASE 
+        WHEN cc.CodOrd IS NOT NULL THEN (SELECT o.Precio FROM ordenador o WHERE o.CodOrd = cc.CodOrd)
+        WHEN cc.CodCha IS NOT NULL THEN (SELECT ch.Precio FROM chasis ch WHERE ch.CodCha = cc.CodCha)
+        WHEN cc.CodFuen IS NOT NULL THEN (SELECT f.Precio FROM fuente f WHERE f.CodFuen = cc.CodFuen)
+        WHEN cc.CodPB IS NOT NULL THEN (SELECT pb.Precio FROM placaBase pb WHERE pb.CodPB = cc.CodPB)
+        WHEN cc.CodAlm IS NOT NULL THEN (SELECT a.Precio FROM almacenamiento a WHERE a.CodAlm = cc.CodAlm)
+        WHEN cc.CodRam IS NOT NULL THEN (SELECT r.Precio FROM ram r WHERE r.CodRam = cc.CodRam)
+        WHEN cc.CodGpu IS NOT NULL THEN (SELECT g.Precio FROM gpu g WHERE g.CodGpu = cc.CodGpu)
+        WHEN cc.CodCpu IS NOT NULL THEN (SELECT cpu.Precio FROM cpu cpu WHERE cpu.CodCpu = cc.CodCpu)
+        WHEN cc.CodVent IS NOT NULL THEN (SELECT v.Precio FROM ventilador v WHERE v.CodVent = cc.CodVent)
+        WHEN cc.CodRefCpu IS NOT NULL THEN (SELECT rc.Precio FROM refrigeracionCpu rc WHERE rc.CodRefCpu = cc.CodRefCpu)
+        WHEN cc.CodRefGpu IS NOT NULL THEN (SELECT rg.Precio FROM refrigeracionGpu rg WHERE rg.CodRefGpu = cc.CodRefGpu)
+        ELSE 0
+      END)
+  FROM contenido_carrito cc
+  WHERE cc.CodCar IN (SELECT CodCar FROM @Carritos);
+  -- Actualiza el PrecioTotal del carrito sumando el precio de todas sus entradas
+  UPDATE c
+  SET c.PrecioTotal = ISNULL((SELECT SUM(cc.Precio) FROM contenido_carrito cc WHERE cc.CodCar = c.CodCar), 0) FROM carrito c WHERE c.CodCar IN (SELECT CodCar FROM @Carritos);
+END;
+GO
+
 --Inserción de carritos
 INSERT INTO carrito (Fecha,PrecioTotal,Estado,CodUsu) 
 VALUES ('2025-03-15',0,'compraRealizada',2),
@@ -878,35 +916,48 @@ VALUES ('2025-03-15',0,'compraRealizada',2),
        (DEFAULT,0,'compraRealizada',8);
 
 --Inserción de los contenidos de los carritos
+--(comprar refrigeración de GPU por aire no tendría sentido ya que su precio es 0, en java se evitará que esto ocurra, 
+--permitiendo añadir solo CodRefGpu que correspondas a refrigeraciones liquidas)
 INSERT INTO contenido_carrito (Precio,Cantidad,CodCar,CodOrd,CodCha,CodFuen,CodPB,CodAlm,CodRam,CodGpu,CodCpu,CodVent,CodRefCpu,CodRefGpu)
-VALUES (0,1,1,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(0,5,1,NULL,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(0,8,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1),
+VALUES (0,1,1,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(0,5,1,NULL,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(0,8,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,4),
        (0,1,2,NULL,NULL,3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(0,1,2,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
        (0,1,3,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL,NULL),(0,2,3,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL),(0,1,3,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL),
        (0,1,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,3,NULL,NULL,NULL),(0,4,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL),(0,2,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL);
        
-/*
+--añadir triggers de insert y update para ordenador y contenidos que verifique la compatibilidad, devolviendo codigos que java capturará, evitando realizar la comprobación en java
+--de forma similar a esto:
 
---Asignación del precio a los contenidos de los carritos (producto asociado * cantidad del mismo en la orden)
-CREATE TRIGGER precioContCar 
-ON contenido_carrito
-ON ordenador
-FOR INSERT, UPDATE
-AS
-BEGIN
+/*CREATE TRIGGER verificar_compatibilidad_insert  
+ON ordenador_contenidos  
+INSTEAD OF INSERT  
+AS  
+BEGIN  
+    DECLARE @Incompatible BIT = 0;  
+
+    -- Simulación de comprobación de compatibilidad  
+    IF EXISTS (SELECT 1 FROM inserted WHERE /* condición de incompatibilidad */)  
+        SET @Incompatible = 1;  
+
+    IF @Incompatible = 1  
+    BEGIN  
+        -- Lanzar error con código personalizado  
+        THROW 50001, 'ERROR_1001: Componente incompatible', 1;  
+        RETURN;  
+    END  
+
+    -- Si es compatible, proceder con la inserción  
+    INSERT INTO ordenador_contenidos (col1, col2, ...)  
+    SELECT col1, col2, ... FROM inserted;  
 END;
 
---Asignación del precio a los carritos (suma del precio de todas las entradas de contenido_carrito vinculadas al carrito)
-CREATE TRIGGER precioCarrito 
-ON carrito
-ON ordenador
-FOR INSERT, UPDATE
-AS
-BEGIN
-END;
+try {
+    PreparedStatement stmt = conexion.prepareStatement("INSERT INTO ordenador_contenidos (...) VALUES (...);");
+    stmt.executeUpdate();
+} catch (SQLException e) {
+    String mensaje = e.getMessage();
+    if (mensaje.contains("ERROR_1001")) {
+        System.out.println("Componente incompatible. ¿Desea intentar otro?");
+    }
+}*/
 
---trigger para precios
---añadir triggers de insert y update que verifiquen que los datos introducidos al crear tablas sean compatibles (quizas, en java puede ser suficiente)
 --añadir comentarios
---reglas de borrado en FKs
-
-*/
