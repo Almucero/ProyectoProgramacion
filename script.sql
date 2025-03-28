@@ -1,6 +1,6 @@
-CREATE DATABASE ProyectoProgramacionSqlServer_v45
+CREATE DATABASE ProyectoProgramacionSqlServer_v54
 GO
-USE ProyectoProgramacionSqlServer_v45
+USE ProyectoProgramacionSqlServer_v54
 GO
 
 --Se establece el formato de la fecha en año-mes-dia, para evitar problemas al luego insertar datos
@@ -300,7 +300,7 @@ CREATE TABLE contenido_carrito
  Precio FLOAT NOT NULL CHECK (Precio>=0), --se deja a 0 y luega se actualiza en base a la cantidad
  Cantidad INT NOT NULL CHECK (Cantidad>0),
  CodCar INT NOT NULL FOREIGN KEY REFERENCES carrito(CodCar),
- CodOrd INT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
+ CodOrd INT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE,
  CodCha INT NULL FOREIGN KEY REFERENCES chasis(CodCha),
  CodFuen INT NULL FOREIGN KEY REFERENCES fuente(CodFuen),
  CodPB INT NULL FOREIGN KEY REFERENCES placaBase(CodPB),
@@ -312,7 +312,144 @@ CREATE TABLE contenido_carrito
  CodRefCpu INT NULL FOREIGN KEY REFERENCES refrigeracionCpu(CodRefCpu),
  CodRefGpu INT NULL FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu)
 );
+GO
 
+--Triggers para eliminar ordenadores completos + sus relaciones con componentes, 
+--o solo relaciones con componentes opcionales individuales opcionales,
+--o relaciones con componentes necesarios + el ordenador entero si no quedan mas relaciones de ese tipo 
+--(ej: relaciones con ram, no puede haber un pc con 0 unidades ram)
+CREATE TRIGGER trg_InsteadDelete_Chasis
+ON chasis
+INSTEAD OF DELETE
+AS
+BEGIN
+    -- Se eliminan los ordenadores que usan el chasis a borrar
+    DELETE FROM ordenador
+    WHERE CodCha IN (SELECT CodCha FROM DELETED);
+    -- Se elimina el registro de chasis
+    DELETE FROM chasis
+    WHERE CodCha IN (SELECT CodCha FROM DELETED);
+END;
+GO
+
+CREATE TRIGGER trg_InsteadDelete_PlacaBase
+ON placaBase
+INSTEAD OF DELETE
+AS
+BEGIN
+    -- Se eliminan los ordenadores que usan la placa base a borrar
+    DELETE FROM ordenador
+    WHERE CodPB IN (SELECT CodPB FROM DELETED);
+    -- Se elimina el registro de placa base
+    DELETE FROM placaBase
+    WHERE CodPB IN (SELECT CodPB FROM DELETED);
+END;
+GO
+
+CREATE TRIGGER trg_InsteadDelete_Almacenamiento
+ON almacenamiento
+INSTEAD OF DELETE
+AS
+BEGIN
+    -- Elimina ordenadores que tengan como almacenamiento principal alguno de los registros a borrar
+    DELETE FROM ordenador
+    WHERE CodAlmPrincipal IN (SELECT CodAlm FROM DELETED);
+    -- Elimina relaciones de almacenamiento secundario en la tabla ord_alm
+    DELETE FROM ord_alm
+    WHERE CodAlmSecundario IN (SELECT CodAlm FROM DELETED);
+    -- Finalmente, elimina el registro de almacenamiento
+    DELETE FROM almacenamiento
+    WHERE CodAlm IN (SELECT CodAlm FROM DELETED);
+END;
+GO
+
+CREATE TRIGGER trg_InsteadDelete_CPU
+ON cpu
+INSTEAD OF DELETE
+AS
+BEGIN
+    -- Se eliminan las relaciones en ord_cpu asociadas al CPU a borrar
+    DELETE FROM ord_cpu
+    WHERE CodCpu IN (SELECT CodCpu FROM DELETED);
+    
+    -- Se elimina el registro de CPU
+    DELETE FROM cpu
+    WHERE CodCpu IN (SELECT CodCpu FROM DELETED);
+    
+    -- Para cada ordenador afectado, si ya no quedan registros en ord_cpu, se elimina el ordenador
+    DELETE FROM ordenador
+    WHERE CodOrd IN (
+         SELECT o.CodOrd
+         FROM ordenador o
+         WHERE NOT EXISTS (SELECT 1 FROM ord_cpu WHERE CodOrd = o.CodOrd)
+    );
+END;
+GO
+
+CREATE TRIGGER trg_InsteadDelete_Fuente
+ON fuente
+INSTEAD OF DELETE
+AS
+BEGIN
+    DELETE FROM ord_fuen
+    WHERE CodFuen IN (SELECT CodFuen FROM DELETED);
+    
+    DELETE FROM fuente
+    WHERE CodFuen IN (SELECT CodFuen FROM DELETED);
+    
+    DELETE FROM ordenador
+    WHERE CodOrd IN (
+         SELECT o.CodOrd
+         FROM ordenador o
+         WHERE NOT EXISTS (SELECT 1 FROM ord_fuen WHERE CodOrd = o.CodOrd)
+    );
+END;
+GO
+
+CREATE TRIGGER trg_InsteadDelete_RAM
+ON ram
+INSTEAD OF DELETE
+AS
+BEGIN
+    DELETE FROM ord_ram
+    WHERE CodRam IN (SELECT CodRam FROM DELETED);
+    
+    DELETE FROM ram
+    WHERE CodRam IN (SELECT CodRam FROM DELETED);
+    
+    DELETE FROM ordenador
+    WHERE CodOrd IN (
+         SELECT o.CodOrd
+         FROM ordenador o
+         WHERE NOT EXISTS (SELECT 1 FROM ord_ram WHERE CodOrd = o.CodOrd)
+    );
+END;
+GO
+
+CREATE TRIGGER trg_InsteadDelete_GPU
+ON gpu
+INSTEAD OF DELETE
+AS
+BEGIN
+    DELETE FROM ord_gpu
+    WHERE CodGpu IN (SELECT CodGpu FROM DELETED);
+    
+    DELETE FROM gpu
+    WHERE CodGpu IN (SELECT CodGpu FROM DELETED);
+END;
+GO
+
+CREATE TRIGGER trg_InsteadDelete_Ventilador
+ON ventilador
+INSTEAD OF DELETE
+AS
+BEGIN
+    DELETE FROM ord_vent
+    WHERE CodVent IN (SELECT CodVent FROM DELETED);
+    
+    DELETE FROM ventilador
+    WHERE CodVent IN (SELECT CodVent FROM DELETED);
+END;
 GO
 
 --Creación del procedimiento que actualizará el precio de los ordenadores en base a los componentes que este tenga + montaje + testeo, 
@@ -322,41 +459,17 @@ AS
 BEGIN
   UPDATE o
   SET o.Precio =
-       ISNULL((SELECT c.Precio FROM chasis c WHERE c.CodCha = o.CodCha), 0) +
-       ISNULL((SELECT pb.Precio FROM placaBase pb WHERE pb.CodPB = o.CodPB), 0) +
-       ISNULL((SELECT a.Precio FROM almacenamiento a WHERE a.CodAlm = o.CodAlmPrincipal), 0) +
-       ISNULL((SELECT SUM((cpu.Precio + refcpu.Precio) * oc.Cantidad)
-                FROM ord_cpu oc
-                JOIN cpu ON cpu.CodCpu = oc.CodCpu
-                JOIN refrigeracionCpu refcpu ON refcpu.CodRefCpu = oc.CodRefCpu
-                WHERE oc.CodOrd = o.CodOrd), 0) +
-       ISNULL((SELECT SUM((g.Precio + refgpu.Precio) * og.Cantidad)
-                FROM ord_gpu og
-                JOIN gpu g ON g.CodGpu = og.CodGpu
-                JOIN refrigeracionGpu refgpu ON refgpu.CodRefGpu = og.CodRefGpu
-                WHERE og.CodOrd = o.CodOrd), 0) +
-       ISNULL((SELECT SUM(v.Precio * ov.Cantidad)
-                FROM ord_vent ov
-                JOIN ventilador v ON v.CodVent = ov.CodVent
-                WHERE ov.CodOrd = o.CodOrd), 0) +
-       ISNULL((SELECT SUM(r.Precio * oram.Cantidad)
-                FROM ord_ram oram
-                JOIN ram r ON r.CodRam = oram.CodRam
-                WHERE oram.CodOrd = o.CodOrd), 0) +
-       ISNULL((SELECT SUM(f.Precio * ofu.Cantidad)
-                FROM ord_fuen ofu
-                JOIN fuente f ON f.CodFuen = ofu.CodFuen
-                WHERE ofu.CodOrd = o.CodOrd), 0) +
-       ISNULL((SELECT SUM(a2.Precio * oa.Cantidad)
-                FROM ord_alm oa
-                JOIN almacenamiento a2 ON a2.CodAlm = oa.CodAlmSecundario
-                WHERE oa.CodOrd = o.CodOrd), 0) +
-       ISNULL((SELECT SUM(m.Precio)
-                FROM montaje m
-                WHERE m.CodOrd = o.CodOrd), 0) +
-       ISNULL((SELECT SUM(t.Precio)
-                FROM testeo t
-                WHERE t.CodOrd = o.CodOrd), 0)
+       ISNULL((SELECT c.Precio FROM chasis c WHERE (c.CodCha=o.CodCha)), 0) +
+       ISNULL((SELECT pb.Precio FROM placaBase pb WHERE (pb.CodPB=o.CodPB)), 0) +
+       ISNULL((SELECT a.Precio FROM almacenamiento a WHERE (a.CodAlm=o.CodAlmPrincipal)), 0) +
+       ISNULL((SELECT SUM((cpu.Precio+refcpu.Precio)*oc.Cantidad) FROM ord_cpu oc JOIN cpu ON (cpu.CodCpu=oc.CodCpu) JOIN refrigeracionCpu refcpu ON (refcpu.CodRefCpu=oc.CodRefCpu) WHERE (oc.CodOrd=o.CodOrd)), 0) +
+       ISNULL((SELECT SUM((g.Precio+refgpu.Precio)*og.Cantidad) FROM ord_gpu og JOIN gpu g ON (g.CodGpu=og.CodGpu) JOIN refrigeracionGpu refgpu ON (refgpu.CodRefGpu=og.CodRefGpu) WHERE (og.CodOrd=o.CodOrd)), 0) +
+       ISNULL((SELECT SUM(v.Precio*ov.Cantidad) FROM ord_vent ov JOIN ventilador v ON (v.CodVent=ov.CodVent) WHERE (ov.CodOrd=o.CodOrd)), 0) +
+       ISNULL((SELECT SUM(r.Precio*oram.Cantidad) FROM ord_ram oram JOIN ram r ON r.CodRam=oram.CodRam WHERE (oram.CodOrd=o.CodOrd)), 0) +
+       ISNULL((SELECT SUM(f.Precio*ofu.Cantidad) FROM ord_fuen ofu JOIN fuente f ON (f.CodFuen=ofu.CodFuen) WHERE (ofu.CodOrd= o.CodOrd)), 0) +
+       ISNULL((SELECT SUM(a2.Precio*oa.Cantidad) FROM ord_alm oa JOIN almacenamiento a2 ON (a2.CodAlm=oa.CodAlmSecundario) WHERE (oa.CodOrd=o.CodOrd)), 0) +
+       ISNULL((SELECT SUM(m.Precio) FROM montaje m WHERE (m.CodOrd=o.CodOrd)), 0) +
+       ISNULL((SELECT SUM(t.Precio) FROM testeo t WHERE (t.CodOrd=o.CodOrd)), 0)
   FROM ordenador o
   WHERE o.CodOrd = @CodOrd;
 END;
@@ -369,7 +482,7 @@ AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
   DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
   OPEN CodOrdCursor;
   FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
   WHILE @@FETCH_STATUS = 0
@@ -389,7 +502,7 @@ AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
   DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
   OPEN CodOrdCursor;
   FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
   WHILE @@FETCH_STATUS = 0
@@ -409,7 +522,7 @@ AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
   DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
   OPEN CodOrdCursor;
   FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
   WHILE @@FETCH_STATUS = 0
@@ -429,7 +542,7 @@ AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
   DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
   OPEN CodOrdCursor;
   FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
   WHILE @@FETCH_STATUS = 0
@@ -449,7 +562,7 @@ AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
   DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
   OPEN CodOrdCursor;
   FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
   WHILE @@FETCH_STATUS = 0
@@ -469,7 +582,7 @@ AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
   DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
   OPEN CodOrdCursor;
   FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
   WHILE @@FETCH_STATUS = 0
@@ -489,7 +602,7 @@ AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
   DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
   OPEN CodOrdCursor;
   FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
   WHILE @@FETCH_STATUS = 0
@@ -509,7 +622,7 @@ AFTER INSERT
 AS
 BEGIN
   DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM inserted;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT CodOrd FROM inserted;
   OPEN CodOrdCursor;
   FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
   WHILE @@FETCH_STATUS = 0
@@ -529,7 +642,7 @@ AFTER INSERT
 AS
 BEGIN
   DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT CodOrd FROM inserted;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT CodOrd FROM inserted;
   OPEN CodOrdCursor;
   FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
   WHILE @@FETCH_STATUS = 0
@@ -904,8 +1017,6 @@ VALUES ('Juan','Pérez',NULL,'12345678A','2005-03-21','Calle Ficticia 123','juan.
        ('Beatriz','Jiménez','Morales','89012345H','2006-08-18','Avenida Libertad 505','beatriz.jimenez@hotmail.com','contrasena505',1),
        ('Fernando','Vázquez','Díaz','90123456I','2000-12-15','Calle del Mar 606','fernando.vazquez@gmail.com','contrasena606',0),
        ('María','Sánchez',NULL,'01234567J','2001-10-25','Avenida 25 707','maria.sanchez@yahoo.com','contrasena707',1);
-
-GO
 
 --Inserción de carritos
 INSERT INTO carrito (Fecha,PrecioTotal,Estado,CodUsu) 
