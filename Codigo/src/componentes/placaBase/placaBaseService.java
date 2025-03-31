@@ -1,5 +1,5 @@
 package componentes.placaBase;
 
-public class placaBaseService {
+public class PlacaBaseService {
     
 }

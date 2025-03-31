@@ -77,7 +77,7 @@ public class App {
     }
     public static void main(String[] args) throws Exception {
         // Configuración de la conexión a la base de datos
-        String url = "jdbc:sqlserver://localhost:1433;databaseName=ProyectoProgramacionSqlServer_12;encrypt=true;trustServerCertificate=true";
+        String url = "jdbc:sqlserver://localhost:1433;databaseName=ProyectoProgramacionSqlServer_25;encrypt=true;trustServerCertificate=true";
         String usuario = "sa";
         String clave = "12062006aB@";
 
