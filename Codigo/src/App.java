@@ -77,7 +77,7 @@ public class App {
     }
     public static void main(String[] args) throws Exception {
         // Configuración de la conexión a la base de datos
-        String url = "jdbc:sqlserver://localhost:1433;databaseName=ProyectoProgramacionSqlServer_25;encrypt=true;trustServerCertificate=true";
+        String url = "jdbc:sqlserver://localhost:1433;databaseName=ProyectoProgramacionSqlServer_v66;encrypt=true;trustServerCertificate=true";
         String usuario = "sa";
         String clave = "12062006aB@";
 
@@ -86,10 +86,10 @@ public class App {
         Connection conn = pool.getConnection();
 
         if (conn!=null) {
-            System.out.println("me cago en dios");
+            System.out.println("se conecto");
         }
         else {
-            System.out.println("me cago en dios parte 2");
+            System.out.println("no se conecto");
         }
         pool.closeAll();
     }

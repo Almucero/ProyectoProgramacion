@@ -1,6 +1,6 @@
-CREATE DATABASE ProyectoProgramacionSqlServer_v54
+CREATE DATABASE ProyectoProgramacionSqlServer_v66
 GO
-USE ProyectoProgramacionSqlServer_v54
+USE ProyectoProgramacionSqlServer_v66
 GO
 
 --Se establece el formato de la fecha en año-mes-dia, para evitar problemas al luego insertar datos
@@ -24,7 +24,7 @@ CREATE TABLE cpu
  Frecuencia FLOAT NOT NULL CHECK (Frecuencia BETWEEN 1 AND 10),
  CodFab INT NULL FOREIGN KEY REFERENCES fabricante(CodFab) ON DELETE SET NULL ON UPDATE CASCADE
 );
---en el caso de la refrigeración (aire o liquida), independientemente de si es de cpu o gpu (liquida solo), la mayoria de modelos deben de usarse en conjunto con
+--En el caso de la refrigeración (aire o liquida), independientemente de si es de cpu o gpu (liquida solo), la mayoria de modelos deben de usarse en conjunto con
 --ventiladores adicionales, para no complicar mucho más la cosa, esos ventiladores en el caso de ordenadores ya montados se incluirian en la tabla
 --de refrigeracion extra sin una relacion directa con la refrigeracion en cuestion y en conjunto con todos los ventiladores usados en el ordenador,
 --sin distincion. En el caaso de compra individual del producto, en este tienda se venderán las refrigeraciones sin ventiladores asociados
@@ -164,7 +164,7 @@ CREATE TABLE ordenador
 );
 CREATE TABLE ord_cpu
 (
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
  CodCpu INT NOT NULL FOREIGN KEY REFERENCES cpu(CodCpu),
  CodRefCpu INT NOT NULL FOREIGN KEY REFERENCES refrigeracionCpu(CodRefCpu),
  Cantidad INT NOT NULL CHECK (Cantidad>0),
@@ -172,7 +172,7 @@ CREATE TABLE ord_cpu
 );
 CREATE TABLE ord_gpu
 (
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
  CodGpu INT NOT NULL FOREIGN KEY REFERENCES gpu(CodGpu),
  CodRefGpu INT NOT NULL FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu),
  Cantidad INT NOT NULL CHECK (Cantidad>0),
@@ -180,28 +180,28 @@ CREATE TABLE ord_gpu
 );
 CREATE TABLE ord_vent
 (
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
  CodVent INT NOT NULL FOREIGN KEY REFERENCES ventilador(CodVent),
  Cantidad INT NOT NULL CHECK (Cantidad>0),
  PRIMARY KEY (CodOrd, CodVent)
 );
 CREATE TABLE ord_ram
 (
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
  CodRam INT NOT NULL FOREIGN KEY REFERENCES ram(CodRam),
  Cantidad INT NOT NULL CHECK (Cantidad>0),
  PRIMARY KEY (CodOrd, CodRam)
 );
 CREATE TABLE ord_fuen
 (
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
  CodFuen INT NOT NULL FOREIGN KEY REFERENCES fuente(CodFuen),
  Cantidad INT NOT NULL CHECK (Cantidad>0),
  PRIMARY KEY (CodOrd, CodFuen)
 );
 CREATE TABLE ord_alm
 (
- CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodOrd INT NOT NULL FOREIGN KEY REFERENCES ordenador(CodOrd),
  CodAlmSecundario INT NOT NULL FOREIGN KEY REFERENCES almacenamiento(CodAlm),
  Cantidad INT NOT NULL CHECK (Cantidad>0),
  PRIMARY KEY (CodOrd, CodAlmSecundario)
@@ -312,143 +312,181 @@ CREATE TABLE contenido_carrito
  CodRefCpu INT NULL FOREIGN KEY REFERENCES refrigeracionCpu(CodRefCpu),
  CodRefGpu INT NULL FOREIGN KEY REFERENCES refrigeracionGpu(CodRefGpu)
 );
+
 GO
 
 --Triggers para eliminar ordenadores completos + sus relaciones con componentes, 
---o solo relaciones con componentes opcionales individuales opcionales,
+--o solo relaciones con componentes opcionales individuales,
 --o relaciones con componentes necesarios + el ordenador entero si no quedan mas relaciones de ese tipo 
 --(ej: relaciones con ram, no puede haber un pc con 0 unidades ram)
+
+--Trigger para eliminar un ordenador + todas las relaciones que este tiene con los componentes
+CREATE TRIGGER trg_InsteadDelete_ordenador
+ON ordenador
+INSTEAD OF DELETE
+AS
+BEGIN
+    EXEC sp_set_session_context 'SkipRelationshipTriggers', 1;
+    DELETE FROM ord_cpu WHERE CodOrd IN (SELECT CodOrd FROM DELETED);
+    DELETE FROM ord_gpu WHERE CodOrd IN (SELECT CodOrd FROM DELETED);
+    DELETE FROM ord_vent WHERE CodOrd IN (SELECT CodOrd FROM DELETED);
+    DELETE FROM ord_ram WHERE CodOrd IN (SELECT CodOrd FROM DELETED);
+    DELETE FROM ord_fuen WHERE CodOrd IN (SELECT CodOrd FROM DELETED);
+    DELETE FROM ord_alm WHERE CodOrd IN (SELECT CodOrd FROM DELETED);
+    DELETE FROM ordenador WHERE CodOrd IN (SELECT CodOrd FROM DELETED);
+    EXEC sp_set_session_context 'SkipRelationshipTriggers', 0;
+END;
+GO
+
+--Trigger para eliminar un chasis + ordenadores asignados
 CREATE TRIGGER trg_InsteadDelete_Chasis
 ON chasis
 INSTEAD OF DELETE
 AS
 BEGIN
-    -- Se eliminan los ordenadores que usan el chasis a borrar
-    DELETE FROM ordenador
-    WHERE CodCha IN (SELECT CodCha FROM DELETED);
-    -- Se elimina el registro de chasis
-    DELETE FROM chasis
-    WHERE CodCha IN (SELECT CodCha FROM DELETED);
+    --Se eliminan los ordenadores que usan el chasis a borrar
+    DELETE FROM ordenador WHERE CodCha IN (SELECT CodCha FROM DELETED);
+    --Se elimina el registro de chasis
+    DELETE FROM chasis WHERE CodCha IN (SELECT CodCha FROM DELETED);
 END;
 GO
 
+--Trigger para eliminar una placa base + todos los ordenadores en los que se use
 CREATE TRIGGER trg_InsteadDelete_PlacaBase
 ON placaBase
 INSTEAD OF DELETE
 AS
 BEGIN
-    -- Se eliminan los ordenadores que usan la placa base a borrar
-    DELETE FROM ordenador
-    WHERE CodPB IN (SELECT CodPB FROM DELETED);
-    -- Se elimina el registro de placa base
-    DELETE FROM placaBase
-    WHERE CodPB IN (SELECT CodPB FROM DELETED);
+    --Se eliminan los ordenadores que usan la placa base a borrar
+    DELETE FROM ordenador WHERE CodPB IN (SELECT CodPB FROM DELETED);
+    
+    --Se elimina el registro de placa base
+    DELETE FROM placaBase WHERE CodPB IN (SELECT CodPB FROM DELETED);
 END;
 GO
 
+--Trigger para eliminar un disco duro, que en caso de ser secundario se eliminaria ademas la relacion con ordenador, 
+--pero en caso de ser principal eliminaría el ordenador también
 CREATE TRIGGER trg_InsteadDelete_Almacenamiento
 ON almacenamiento
 INSTEAD OF DELETE
 AS
 BEGIN
-    -- Elimina ordenadores que tengan como almacenamiento principal alguno de los registros a borrar
-    DELETE FROM ordenador
-    WHERE CodAlmPrincipal IN (SELECT CodAlm FROM DELETED);
-    -- Elimina relaciones de almacenamiento secundario en la tabla ord_alm
-    DELETE FROM ord_alm
-    WHERE CodAlmSecundario IN (SELECT CodAlm FROM DELETED);
-    -- Finalmente, elimina el registro de almacenamiento
-    DELETE FROM almacenamiento
-    WHERE CodAlm IN (SELECT CodAlm FROM DELETED);
+    --Elimina ordenadores que tengan como almacenamiento principal alguno de los registros a borrar
+    DELETE FROM ordenador WHERE CodAlmPrincipal IN (SELECT CodAlm FROM DELETED);
+    --Elimina relaciones de almacenamiento secundario en la tabla ord_alm
+    DELETE FROM ord_alm WHERE CodAlmSecundario IN (SELECT CodAlm FROM DELETED);
+    --Finalmente, elimina el registro de almacenamiento
+    DELETE FROM almacenamiento WHERE CodAlm IN (SELECT CodAlm FROM DELETED);
 END;
 GO
 
+--Trigger para eliminar una CPU, su relación con ordenadores, y de ser la unica entrada de CPU que ese ordenador tenía, el ordenador también
 CREATE TRIGGER trg_InsteadDelete_CPU
 ON cpu
 INSTEAD OF DELETE
 AS
 BEGIN
-    -- Se eliminan las relaciones en ord_cpu asociadas al CPU a borrar
-    DELETE FROM ord_cpu
-    WHERE CodCpu IN (SELECT CodCpu FROM DELETED);
-    
-    -- Se elimina el registro de CPU
-    DELETE FROM cpu
-    WHERE CodCpu IN (SELECT CodCpu FROM DELETED);
-    
-    -- Para cada ordenador afectado, si ya no quedan registros en ord_cpu, se elimina el ordenador
-    DELETE FROM ordenador
-    WHERE CodOrd IN (
-         SELECT o.CodOrd
-         FROM ordenador o
-         WHERE NOT EXISTS (SELECT 1 FROM ord_cpu WHERE CodOrd = o.CodOrd)
-    );
+    --Se eliminan las relaciones en ord_cpu asociadas al CPU a borrar
+    DELETE FROM ord_cpu WHERE CodCpu IN (SELECT CodCpu FROM DELETED);
+    --Se elimina el registro de CPU
+    DELETE FROM cpu WHERE CodCpu IN (SELECT CodCpu FROM DELETED);
+    --Para cada ordenador afectado, si ya no quedan registros en ord_cpu, se elimina el ordenador
+    DELETE FROM ordenador WHERE CodOrd IN (SELECT o.CodOrd FROM ordenador o WHERE NOT EXISTS (SELECT 1 FROM ord_cpu WHERE CodOrd = o.CodOrd));
 END;
 GO
 
+--Trigger para eliminar una entrada en la tabla relación entre ordenador y CPU, y igual que antes, de ser la unica entrada, el ordenador también
+CREATE TRIGGER trg_InsteadDelete_ord_cpu
+ON ord_cpu
+INSTEAD OF DELETE
+AS
+BEGIN
+    IF ISNULL(SESSION_CONTEXT(N'SkipRelationshipTriggers'), 0) = 1
+    BEGIN
+        DELETE FROM ord_cpu WHERE EXISTS (SELECT 1 FROM DELETED d WHERE d.CodOrd = ord_cpu.CodOrd AND d.CodCpu = ord_cpu.CodCpu AND d.CodRefCpu = ord_cpu.CodRefCpu);
+        RETURN;
+    END;
+    DELETE FROM ord_cpu WHERE EXISTS (SELECT 1 FROM DELETED d WHERE d.CodOrd = ord_cpu.CodOrd AND d.CodCpu = ord_cpu.CodCpu AND d.CodRefCpu = ord_cpu.CodRefCpu);
+    DELETE FROM ordenador WHERE CodOrd IN (SELECT DISTINCT CodOrd FROM DELETED) AND NOT EXISTS (SELECT 1 FROM ord_cpu WHERE ord_cpu.CodOrd = ordenador.CodOrd);
+END;
+GO
+
+--Trigger para eliminar una fuente + las relaciones que tuviese con ordenadores + esos ordenadores en caso de no tener más fuentes
 CREATE TRIGGER trg_InsteadDelete_Fuente
 ON fuente
 INSTEAD OF DELETE
 AS
 BEGIN
-    DELETE FROM ord_fuen
-    WHERE CodFuen IN (SELECT CodFuen FROM DELETED);
-    
-    DELETE FROM fuente
-    WHERE CodFuen IN (SELECT CodFuen FROM DELETED);
-    
-    DELETE FROM ordenador
-    WHERE CodOrd IN (
-         SELECT o.CodOrd
-         FROM ordenador o
-         WHERE NOT EXISTS (SELECT 1 FROM ord_fuen WHERE CodOrd = o.CodOrd)
-    );
+    DELETE FROM ord_fuen WHERE CodFuen IN (SELECT CodFuen FROM DELETED);
+    DELETE FROM fuente WHERE CodFuen IN (SELECT CodFuen FROM DELETED);
+    DELETE FROM ordenador WHERE CodOrd IN (SELECT o.CodOrd FROM ordenador o WHERE NOT EXISTS (SELECT 1 FROM ord_fuen WHERE CodOrd = o.CodOrd));
 END;
 GO
 
+--Trigger para eliminar una tabla de relación entre una fuente y un ordenador, y igual que antes, el ordenador también en caso de ser la única entrada
+CREATE TRIGGER trg_InsteadDelete_ord_fuen
+ON ord_fuen
+INSTEAD OF DELETE
+AS
+BEGIN
+    IF ISNULL(SESSION_CONTEXT(N'SkipRelationshipTriggers'), 0) = 1
+    BEGIN
+        DELETE FROM ord_fuen WHERE EXISTS (SELECT 1 FROM DELETED d WHERE d.CodOrd = ord_fuen.CodOrd AND d.CodFuen = ord_fuen.CodFuen);
+        RETURN;
+    END;
+    DELETE FROM ord_fuen WHERE EXISTS (SELECT 1 FROM DELETED d WHERE d.CodOrd = ord_fuen.CodOrd AND d.CodFuen = ord_fuen.CodFuen);
+    DELETE FROM ordenador WHERE CodOrd IN (SELECT DISTINCT CodOrd FROM DELETED) AND NOT EXISTS (SELECT 1 FROM ord_fuen WHERE ord_fuen.CodOrd = ordenador.CodOrd);
+END;
+GO
+
+--Trigger para eliminar una RAM + sus relaciones con ordenadores + esos ordenadores de no tener más RAM
 CREATE TRIGGER trg_InsteadDelete_RAM
 ON ram
 INSTEAD OF DELETE
 AS
 BEGIN
-    DELETE FROM ord_ram
-    WHERE CodRam IN (SELECT CodRam FROM DELETED);
-    
-    DELETE FROM ram
-    WHERE CodRam IN (SELECT CodRam FROM DELETED);
-    
-    DELETE FROM ordenador
-    WHERE CodOrd IN (
-         SELECT o.CodOrd
-         FROM ordenador o
-         WHERE NOT EXISTS (SELECT 1 FROM ord_ram WHERE CodOrd = o.CodOrd)
-    );
+    DELETE FROM ord_ram WHERE CodRam IN (SELECT CodRam FROM DELETED);
+    DELETE FROM ram WHERE CodRam IN (SELECT CodRam FROM DELETED);
+    DELETE FROM ordenador WHERE CodOrd IN (SELECT o.CodOrd FROM ordenador o WHERE NOT EXISTS (SELECT 1 FROM ord_ram WHERE CodOrd = o.CodOrd));
 END;
 GO
 
+--Trigger para eliminar una tabla de relación entre RAM y ordenador, eliminando también el ordenador en caso de no tener este más RAM
+CREATE TRIGGER trg_InsteadDelete_ord_ram
+ON ord_ram
+INSTEAD OF DELETE
+AS
+BEGIN
+    IF ISNULL(SESSION_CONTEXT(N'SkipRelationshipTriggers'), 0) = 1
+    BEGIN
+        DELETE FROM ord_ram WHERE EXISTS (SELECT 1 FROM DELETED d WHERE d.CodOrd = ord_ram.CodOrd AND d.CodRam = ord_ram.CodRam);
+        RETURN;
+    END;
+    DELETE FROM ord_ram WHERE EXISTS (SELECT 1 FROM DELETED d WHERE d.CodOrd = ord_ram.CodOrd AND d.CodRam = ord_ram.CodRam);
+    DELETE FROM ordenador WHERE CodOrd IN (SELECT DISTINCT CodOrd FROM DELETED) AND NOT EXISTS (SELECT 1 FROM ord_ram WHERE ord_ram.CodOrd = ordenador.CodOrd);
+END;
+GO
+
+--Trigger para eliminar una GPU + las relaciones que esta tenga con ordenadores
 CREATE TRIGGER trg_InsteadDelete_GPU
 ON gpu
 INSTEAD OF DELETE
 AS
 BEGIN
-    DELETE FROM ord_gpu
-    WHERE CodGpu IN (SELECT CodGpu FROM DELETED);
-    
-    DELETE FROM gpu
-    WHERE CodGpu IN (SELECT CodGpu FROM DELETED);
+    DELETE FROM ord_gpu WHERE CodGpu IN (SELECT CodGpu FROM DELETED);
+    DELETE FROM gpu WHERE CodGpu IN (SELECT CodGpu FROM DELETED);
 END;
 GO
 
+--Trigger para eliminar un ventilador + las relaciones que este tenga con ordenadores
 CREATE TRIGGER trg_InsteadDelete_Ventilador
 ON ventilador
 INSTEAD OF DELETE
 AS
 BEGIN
-    DELETE FROM ord_vent
-    WHERE CodVent IN (SELECT CodVent FROM DELETED);
-    
-    DELETE FROM ventilador
-    WHERE CodVent IN (SELECT CodVent FROM DELETED);
+    DELETE FROM ord_vent WHERE CodVent IN (SELECT CodVent FROM DELETED);
+    DELETE FROM ventilador WHERE CodVent IN (SELECT CodVent FROM DELETED);
 END;
 GO
 
@@ -495,6 +533,26 @@ BEGIN
 END;
 GO
 
+--Trigger para capturar actualizaciones en la tabla "cpu" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_update_precio_cpu
+ON cpu
+AFTER UPDATE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT oc.CodOrd FROM ord_cpu oc JOIN inserted i ON oc.CodCpu = i.CodCpu;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
 --Trigger para capturar inserciones, actualizaciones o borrados en la tabla "ord_cpu" y actualizar el precio total del ordenador asociado
 CREATE TRIGGER trg_ord_cpu
 ON ord_cpu
@@ -503,6 +561,26 @@ AS
 BEGIN
   DECLARE @CodOrd INT;
   DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Trigger para capturar actualizaciones en la tabla "gpu" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_update_precio_gpu
+ON gpu
+AFTER UPDATE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT og.CodOrd FROM ord_gpu og JOIN inserted i ON og.CodGpu = i.CodGpu;
   OPEN CodOrdCursor;
   FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
   WHILE @@FETCH_STATUS = 0
@@ -535,6 +613,26 @@ BEGIN
 END;
 GO
 
+--Trigger para capturar inserciones, actualizaciones o borrados en la tabla "ventilador" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_ventilador
+ON ventilador
+AFTER UPDATE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT ov.CodOrd FROM ord_vent ov JOIN inserted i ON ov.CodVent = i.CodVent;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
 --Trigger para capturar inserciones, actualizaciones o borrados en la tabla "ord_vent" y actualizar el precio total del ordenador asociado
 CREATE TRIGGER trg_ord_vent
 ON ord_vent
@@ -543,6 +641,26 @@ AS
 BEGIN
   DECLARE @CodOrd INT;
   DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Trigger para capturar actualizaciones en la tabla "ram" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_update_precio_ram
+ON ram
+AFTER UPDATE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT oram.CodOrd FROM ord_ram oram JOIN inserted i ON oram.CodRam = i.CodRam;
   OPEN CodOrdCursor;
   FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
   WHILE @@FETCH_STATUS = 0
@@ -575,6 +693,26 @@ BEGIN
 END;
 GO
 
+--Trigger para capturar actualizaciones en la tabla "fuente" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_update_precio_fuen
+ON fuente
+AFTER UPDATE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT ofu.CodOrd FROM ord_fuen ofu JOIN inserted i ON ofu.CodFuen = i.CodFuen;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
 --Trigger para capturar inserciones, actualizaciones o borrados en la tabla "ord_fuen" y actualizar el precio total del ordenador asociado
 CREATE TRIGGER trg_ord_fuen
 ON ord_fuen
@@ -583,6 +721,26 @@ AS
 BEGIN
   DECLARE @CodOrd INT;
   DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT CodOrd FROM (SELECT CodOrd FROM inserted UNION SELECT CodOrd FROM deleted) AS Cods;
+  OPEN CodOrdCursor;
+  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    EXEC recalculaPrecioTotal @CodOrd;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+  END;
+  CLOSE CodOrdCursor;
+  DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Trigger para capturar actualizaciones en la tabla "almacenamiento" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_update_precio_alm
+ON almacenamiento
+AFTER UPDATE
+AS
+BEGIN
+  DECLARE @CodOrd INT;
+  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT oa.CodOrd FROM ord_alm oa JOIN inserted i ON oa.CodAlmSecundario = i.CodAlm;
   OPEN CodOrdCursor;
   FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
   WHILE @@FETCH_STATUS = 0
@@ -681,8 +839,7 @@ BEGIN
         WHEN cc.CodRefGpu IS NOT NULL THEN (SELECT rg.Precio FROM refrigeracionGpu rg WHERE rg.CodRefGpu = cc.CodRefGpu)
         ELSE 0
       END)
-  FROM contenido_carrito cc
-  WHERE cc.CodCar IN (SELECT CodCar FROM @Carritos);
+  FROM contenido_carrito cc WHERE cc.CodCar IN (SELECT CodCar FROM @Carritos);
   -- Actualiza el PrecioTotal del carrito sumando el precio de todas sus entradas
   UPDATE c
   SET c.PrecioTotal = ISNULL((SELECT SUM(cc.Precio) FROM contenido_carrito cc WHERE cc.CodCar = c.CodCar), 0) FROM carrito c WHERE c.CodCar IN (SELECT CodCar FROM @Carritos);
