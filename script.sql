@@ -1,6 +1,6 @@
-CREATE DATABASE ProyectoProgramacionSqlServer_v66
+CREATE DATABASE ProyectoProgramacionSqlServer_v73
 GO
-USE ProyectoProgramacionSqlServer_v66
+USE ProyectoProgramacionSqlServer_v73
 GO
 
 --Se establece el formato de la fecha en año-mes-dia, para evitar problemas al luego insertar datos
@@ -299,8 +299,8 @@ CREATE TABLE contenido_carrito
  CodConCar INT NOT NULL PRIMARY KEY IDENTITY(1, 1),
  Precio FLOAT NOT NULL CHECK (Precio>=0), --se deja a 0 y luega se actualiza en base a la cantidad
  Cantidad INT NOT NULL CHECK (Cantidad>0),
- CodCar INT NOT NULL FOREIGN KEY REFERENCES carrito(CodCar),
- CodOrd INT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE,
+ CodCar INT NOT NULL FOREIGN KEY REFERENCES carrito(CodCar) ON DELETE CASCADE ON UPDATE CASCADE,
+ CodOrd INT NULL FOREIGN KEY REFERENCES ordenador(CodOrd) ON DELETE CASCADE ON UPDATE CASCADE,
  CodCha INT NULL FOREIGN KEY REFERENCES chasis(CodCha),
  CodFuen INT NULL FOREIGN KEY REFERENCES fuente(CodFuen),
  CodPB INT NULL FOREIGN KEY REFERENCES placaBase(CodPB),
@@ -344,6 +344,8 @@ ON chasis
 INSTEAD OF DELETE
 AS
 BEGIN
+    --Se eliminan las entradas en contenido_carrito que referencian directamente el chasis a borrar
+    DELETE cc FROM contenido_carrito cc JOIN DELETED d ON cc.CodCha = d.CodCha;
     --Se eliminan los ordenadores que usan el chasis a borrar
     DELETE FROM ordenador WHERE CodCha IN (SELECT CodCha FROM DELETED);
     --Se elimina el registro de chasis
@@ -357,9 +359,10 @@ ON placaBase
 INSTEAD OF DELETE
 AS
 BEGIN
+    --Se eliminan las filas en contenido_carrito que referencian directamente la placa base a borrar
+    DELETE cc FROM contenido_carrito cc JOIN DELETED d ON cc.CodPB = d.CodPB;
     --Se eliminan los ordenadores que usan la placa base a borrar
     DELETE FROM ordenador WHERE CodPB IN (SELECT CodPB FROM DELETED);
-    
     --Se elimina el registro de placa base
     DELETE FROM placaBase WHERE CodPB IN (SELECT CodPB FROM DELETED);
 END;
@@ -372,6 +375,8 @@ ON almacenamiento
 INSTEAD OF DELETE
 AS
 BEGIN
+    --Se eliminan las filas en contenido_carrito que referencian directamente el almacenamiento a borrar
+    DELETE cc FROM contenido_carrito cc JOIN DELETED d ON cc.CodAlm = d.CodAlm;
     --Elimina ordenadores que tengan como almacenamiento principal alguno de los registros a borrar
     DELETE FROM ordenador WHERE CodAlmPrincipal IN (SELECT CodAlm FROM DELETED);
     --Elimina relaciones de almacenamiento secundario en la tabla ord_alm
@@ -387,12 +392,20 @@ ON cpu
 INSTEAD OF DELETE
 AS
 BEGIN
+    BEGIN TRANSACTION;
+    --Evita que trg_InsteadDelete_ord_cpu se dispare durante esta operación
+    EXEC sp_set_session_context 'SkipRelationshipTriggers', 1;
+    --Se eliminan las filas en contenido_carrito que referencian la CPU a borrar
+    DELETE cc FROM contenido_carrito cc JOIN DELETED d ON cc.CodCpu = d.CodCpu;
     --Se eliminan las relaciones en ord_cpu asociadas al CPU a borrar
     DELETE FROM ord_cpu WHERE CodCpu IN (SELECT CodCpu FROM DELETED);
     --Se elimina el registro de CPU
     DELETE FROM cpu WHERE CodCpu IN (SELECT CodCpu FROM DELETED);
     --Para cada ordenador afectado, si ya no quedan registros en ord_cpu, se elimina el ordenador
-    DELETE FROM ordenador WHERE CodOrd IN (SELECT o.CodOrd FROM ordenador o WHERE NOT EXISTS (SELECT 1 FROM ord_cpu WHERE CodOrd = o.CodOrd));
+    DELETE FROM ordenador WHERE CodOrd IN (SELECT o.CodOrd FROM ordenador o WHERE NOT EXISTS (SELECT 1 FROM ord_cpu WHERE ord_cpu.CodOrd = o.CodOrd));
+    -- Restaurar SkipRelationshipTriggers
+    EXEC sp_set_session_context 'SkipRelationshipTriggers', 0;
+    COMMIT TRANSACTION;
 END;
 GO
 
@@ -418,8 +431,13 @@ ON fuente
 INSTEAD OF DELETE
 AS
 BEGIN
+    --Se eliminan las filas en contenido_carrito que referencian directamente la fuente a borrar
+    DELETE cc FROM contenido_carrito cc JOIN DELETED d ON cc.CodFuen = d.CodFuen;
+	--Se eliminan las relaciones en ord_fuen asociadas a la fuente a borrar
     DELETE FROM ord_fuen WHERE CodFuen IN (SELECT CodFuen FROM DELETED);
+	--Se elimina el registro de fuente
     DELETE FROM fuente WHERE CodFuen IN (SELECT CodFuen FROM DELETED);
+    --Para cada ordenador afectado, si ya no quedan relaciones de fuente, se elimina el ordenador
     DELETE FROM ordenador WHERE CodOrd IN (SELECT o.CodOrd FROM ordenador o WHERE NOT EXISTS (SELECT 1 FROM ord_fuen WHERE CodOrd = o.CodOrd));
 END;
 GO
@@ -446,8 +464,13 @@ ON ram
 INSTEAD OF DELETE
 AS
 BEGIN
+    --Se eliminan las filas en contenido_carrito que referencian directamente la RAM a borrar
+    DELETE cc FROM contenido_carrito cc JOIN DELETED d ON cc.CodRam = d.CodRam;
+	--Se eliminan las relaciones en ord_ram asociadas a la RAM a borrar
     DELETE FROM ord_ram WHERE CodRam IN (SELECT CodRam FROM DELETED);
+	--Se elimina el registro de RAM
     DELETE FROM ram WHERE CodRam IN (SELECT CodRam FROM DELETED);
+	--Para cada ordenador afectado, si ya no quedan relaciones de RAM, se elimina el ordenador
     DELETE FROM ordenador WHERE CodOrd IN (SELECT o.CodOrd FROM ordenador o WHERE NOT EXISTS (SELECT 1 FROM ord_ram WHERE CodOrd = o.CodOrd));
 END;
 GO
@@ -474,7 +497,11 @@ ON gpu
 INSTEAD OF DELETE
 AS
 BEGIN
+    --Se eliminan las filas en contenido_carrito que referencian directamente la GPU a borrar
+    DELETE cc FROM contenido_carrito cc JOIN DELETED d ON cc.CodGpu = d.CodGpu;
+	--Se eliminan las relaciones en ord_gpu asociadas a la GPU a borrar
     DELETE FROM ord_gpu WHERE CodGpu IN (SELECT CodGpu FROM DELETED);
+	--Se elimina el registro de GPU
     DELETE FROM gpu WHERE CodGpu IN (SELECT CodGpu FROM DELETED);
 END;
 GO
@@ -485,8 +512,42 @@ ON ventilador
 INSTEAD OF DELETE
 AS
 BEGIN
+    --Se eliminan las filas en contenido_carrito que referencian directamente el ventilador a borrar
+    DELETE cc FROM contenido_carrito cc JOIN DELETED d ON cc.CodVent = d.CodVent;
+	--Se eliminan las relaciones en ord_vent asociadas al ventilador a borrar
     DELETE FROM ord_vent WHERE CodVent IN (SELECT CodVent FROM DELETED);
+	--Se elimina el registro de ventilador
     DELETE FROM ventilador WHERE CodVent IN (SELECT CodVent FROM DELETED);
+END;
+GO
+
+--Trigger para eliminar una refrigeración de CPU + limpiar carrito y relaciones con ordenadores si fuera necesario
+CREATE TRIGGER trg_InsteadDelete_RefrigeracionCpu
+ON refrigeracionCpu
+INSTEAD OF DELETE
+AS
+BEGIN
+    --Se eliminan las filas en contenido_carrito que referencian la refrigeración de CPU a borrar
+    DELETE cc FROM contenido_carrito cc JOIN DELETED d ON cc.CodRefCpu = d.CodRefCpu;
+    --Se eliminan las relaciones en ord_cpu asociadas a la refrigeración de CPU a borrar
+    DELETE oc FROM ord_cpu oc JOIN DELETED d ON oc.CodRefCpu = d.CodRefCpu;
+    --Se elimina el registro de refrigeración de CPU
+    DELETE rc FROM refrigeracionCpu rc JOIN DELETED d ON rc.CodRefCpu = d.CodRefCpu;
+END;
+GO
+
+--Trigger para eliminar una refrigeración de GPU + limpiar carrito y relaciones con ordenadores
+CREATE TRIGGER trg_InsteadDelete_RefrigeracionGpu
+ON refrigeracionGpu
+INSTEAD OF DELETE
+AS
+BEGIN
+    --Se eliminan las filas en contenido_carrito que referencian la refrigeración de GPU a borrar
+    DELETE cc FROM contenido_carrito cc JOIN DELETED d ON cc.CodRefGpu = d.CodRefGpu;
+    --Se eliminan las relaciones en ord_gpu asociadas a la refrigeración de GPU a borrar
+    DELETE og FROM ord_gpu og JOIN DELETED d ON og.CodRefGpu = d.CodRefGpu;
+    --Se elimina el registro de refrigeración de GPU
+    DELETE rg FROM refrigeracionGpu rg JOIN DELETED d ON rg.CodRefGpu = d.CodRefGpu;
 END;
 GO
 
@@ -539,17 +600,22 @@ ON cpu
 AFTER UPDATE
 AS
 BEGIN
-  DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT oc.CodOrd FROM ord_cpu oc JOIN inserted i ON oc.CodCpu = i.CodCpu;
-  OPEN CodOrdCursor;
-  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
-  WHILE @@FETCH_STATUS = 0
-  BEGIN
-    EXEC recalculaPrecioTotal @CodOrd;
+    --Recalcular precio total de cada PC que usa la CPU modificada
+    DECLARE @CodOrd INT;
+    DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT oc.CodOrd FROM ord_cpu oc JOIN inserted i ON oc.CodCpu = i.CodCpu;
+    OPEN CodOrdCursor;
     FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
-  END;
-  CLOSE CodOrdCursor;
-  DEALLOCATE CodOrdCursor;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC recalculaPrecioTotal @CodOrd;
+        FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    END;
+    CLOSE CodOrdCursor;
+    DEALLOCATE CodOrdCursor;
+    --Actualizar precio en contenido_carrito para CPUs sueltas
+    UPDATE cc SET cc.Precio = cc.Cantidad * i.Precio FROM contenido_carrito cc JOIN inserted i ON cc.CodCpu = i.CodCpu;
+    --Actualizar precio en contenido_carrito para PCs empaquetados
+    UPDATE cc SET cc.Precio = cc.Cantidad * o.Precio FROM contenido_carrito cc JOIN inserted i2 ON EXISTS (SELECT 1 FROM ord_cpu oc WHERE oc.CodOrd = cc.CodOrd AND oc.CodCpu = i2.CodCpu) JOIN ordenador o ON o.CodOrd = cc.CodOrd WHERE cc.CodOrd IS NOT NULL;
 END;
 GO
 
@@ -579,17 +645,22 @@ ON gpu
 AFTER UPDATE
 AS
 BEGIN
-  DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT og.CodOrd FROM ord_gpu og JOIN inserted i ON og.CodGpu = i.CodGpu;
-  OPEN CodOrdCursor;
-  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
-  WHILE @@FETCH_STATUS = 0
-  BEGIN
-    EXEC recalculaPrecioTotal @CodOrd;
+    --Recalcular precio total de cada PC que usa la GPU modificada
+    DECLARE @CodOrd INT;
+    DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT og.CodOrd FROM ord_gpu og JOIN inserted i ON og.CodGpu = i.CodGpu;
+    OPEN CodOrdCursor;
     FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
-  END;
-  CLOSE CodOrdCursor;
-  DEALLOCATE CodOrdCursor;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC recalculaPrecioTotal @CodOrd;
+        FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    END;
+    CLOSE CodOrdCursor;
+    DEALLOCATE CodOrdCursor;
+    --Actualizar precio en contenido_carrito para GPUs sueltas
+    UPDATE cc SET cc.Precio = cc.Cantidad * i.Precio FROM contenido_carrito cc JOIN inserted i ON cc.CodGpu = i.CodGpu;
+    --Actualizar precio en contenido_carrito para PCs empaquetados
+    UPDATE cc SET cc.Precio = cc.Cantidad * o.Precio FROM contenido_carrito cc JOIN inserted i2 ON EXISTS (SELECT 1 FROM ord_gpu og WHERE og.CodOrd = cc.CodOrd AND og.CodGpu = i2.CodGpu) JOIN ordenador o ON o.CodOrd = cc.CodOrd WHERE cc.CodOrd IS NOT NULL;
 END;
 GO
 
@@ -614,22 +685,27 @@ END;
 GO
 
 --Trigger para capturar inserciones, actualizaciones o borrados en la tabla "ventilador" y actualizar el precio total del ordenador asociado
-CREATE TRIGGER trg_ventilador
+CREATE TRIGGER trg_update_precio_ventilador
 ON ventilador
 AFTER UPDATE
 AS
 BEGIN
-  DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT ov.CodOrd FROM ord_vent ov JOIN inserted i ON ov.CodVent = i.CodVent;
-  OPEN CodOrdCursor;
-  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
-  WHILE @@FETCH_STATUS = 0
-  BEGIN
-    EXEC recalculaPrecioTotal @CodOrd;
+    --Recalcular precio total de cada PC que usa el ventilador modificado
+    DECLARE @CodOrd INT;
+    DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT ov.CodOrd FROM ord_vent ov JOIN inserted i ON ov.CodVent = i.CodVent;
+    OPEN CodOrdCursor;
     FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
-  END;
-  CLOSE CodOrdCursor;
-  DEALLOCATE CodOrdCursor;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC recalculaPrecioTotal @CodOrd;
+        FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    END;
+    CLOSE CodOrdCursor;
+    DEALLOCATE CodOrdCursor;
+    --Actualizar precio en contenido_carrito para ventiladores sueltos
+    UPDATE cc SET cc.Precio = cc.Cantidad * i.Precio FROM contenido_carrito cc JOIN inserted i ON cc.CodVent = i.CodVent;
+    --Actualizar precio en contenido_carrito para PCs empaquetados
+    UPDATE cc SET cc.Precio = cc.Cantidad * o.Precio FROM contenido_carrito cc JOIN inserted i2 ON EXISTS (SELECT 1 FROM ord_vent ov WHERE ov.CodOrd = cc.CodOrd AND ov.CodVent = i2.CodVent) JOIN ordenador o ON o.CodOrd = cc.CodOrd WHERE cc.CodOrd IS NOT NULL;
 END;
 GO
 
@@ -659,17 +735,22 @@ ON ram
 AFTER UPDATE
 AS
 BEGIN
-  DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT oram.CodOrd FROM ord_ram oram JOIN inserted i ON oram.CodRam = i.CodRam;
-  OPEN CodOrdCursor;
-  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
-  WHILE @@FETCH_STATUS = 0
-  BEGIN
-    EXEC recalculaPrecioTotal @CodOrd;
+    --Recalcular precio total de cada PC que usa la RAM modificada
+    DECLARE @CodOrd INT;
+    DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT oram.CodOrd FROM ord_ram oram JOIN inserted i ON oram.CodRam = i.CodRam;
+    OPEN CodOrdCursor;
     FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
-  END;
-  CLOSE CodOrdCursor;
-  DEALLOCATE CodOrdCursor;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC recalculaPrecioTotal @CodOrd;
+        FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    END;
+    CLOSE CodOrdCursor;
+    DEALLOCATE CodOrdCursor;
+    --Actualizar precio en contenido_carrito para RAM sueltas
+    UPDATE cc SET cc.Precio = cc.Cantidad * i.Precio FROM contenido_carrito cc JOIN inserted i ON cc.CodRam = i.CodRam;
+    --Actualizar precio en contenido_carrito para PCs empaquetados
+    UPDATE cc SET cc.Precio = cc.Cantidad * o.Precio FROM contenido_carrito cc JOIN inserted i2 ON EXISTS (SELECT 1 FROM ord_ram oram WHERE oram.CodOrd = cc.CodOrd AND oram.CodRam = i2.CodRam) JOIN ordenador o ON o.CodOrd = cc.CodOrd WHERE cc.CodOrd IS NOT NULL;
 END;
 GO
 
@@ -699,17 +780,22 @@ ON fuente
 AFTER UPDATE
 AS
 BEGIN
-  DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT ofu.CodOrd FROM ord_fuen ofu JOIN inserted i ON ofu.CodFuen = i.CodFuen;
-  OPEN CodOrdCursor;
-  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
-  WHILE @@FETCH_STATUS = 0
-  BEGIN
-    EXEC recalculaPrecioTotal @CodOrd;
+    --Recalcular precio total de cada PC que usa la fuente modificada
+    DECLARE @CodOrd INT;
+    DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT ofu.CodOrd FROM ord_fuen ofu JOIN inserted i ON ofu.CodFuen = i.CodFuen;
+    OPEN CodOrdCursor;
     FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
-  END;
-  CLOSE CodOrdCursor;
-  DEALLOCATE CodOrdCursor;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC recalculaPrecioTotal @CodOrd;
+        FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    END;
+    CLOSE CodOrdCursor;
+    DEALLOCATE CodOrdCursor;
+    --Actualizar precio en contenido_carrito para fuentes sueltas
+    UPDATE cc SET cc.Precio = cc.Cantidad * i.Precio FROM contenido_carrito cc JOIN inserted i ON cc.CodFuen = i.CodFuen;
+    --Actualizar precio en contenido_carrito para PCs empaquetados
+    UPDATE cc SET cc.Precio = cc.Cantidad * o.Precio FROM contenido_carrito cc JOIN inserted i2 ON EXISTS (SELECT 1 FROM ord_fuen ofu WHERE ofu.CodOrd = cc.CodOrd AND ofu.CodFuen = i2.CodFuen) JOIN ordenador o ON o.CodOrd = cc.CodOrd WHERE cc.CodOrd IS NOT NULL;
 END;
 GO
 
@@ -739,17 +825,22 @@ ON almacenamiento
 AFTER UPDATE
 AS
 BEGIN
-  DECLARE @CodOrd INT;
-  DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT oa.CodOrd FROM ord_alm oa JOIN inserted i ON oa.CodAlmSecundario = i.CodAlm;
-  OPEN CodOrdCursor;
-  FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
-  WHILE @@FETCH_STATUS = 0
-  BEGIN
-    EXEC recalculaPrecioTotal @CodOrd;
+    --Recalcular precio total de cada PC que usa el almacenamiento modificado
+    DECLARE @CodOrd INT;
+    DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT oa.CodOrd FROM ord_alm oa JOIN inserted i ON oa.CodAlmSecundario = i.CodAlm;
+    OPEN CodOrdCursor;
     FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
-  END;
-  CLOSE CodOrdCursor;
-  DEALLOCATE CodOrdCursor;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC recalculaPrecioTotal @CodOrd;
+        FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    END;
+    CLOSE CodOrdCursor;
+    DEALLOCATE CodOrdCursor;
+    --Actualizar precio en contenido_carrito para almacenamientos sueltos
+    UPDATE cc SET cc.Precio = cc.Cantidad * i.Precio FROM contenido_carrito cc JOIN inserted i ON cc.CodAlm = i.CodAlm;
+    --Actualizar precio en contenido_carrito para PCs empaquetados
+    UPDATE cc SET cc.Precio = cc.Cantidad * o.Precio FROM contenido_carrito cc JOIN inserted i2 ON EXISTS (SELECT 1 FROM ord_alm oa WHERE oa.CodOrd = cc.CodOrd AND oa.CodAlmSecundario = i2.CodAlm) JOIN ordenador o ON o.CodOrd = cc.CodOrd WHERE cc.CodOrd IS NOT NULL;
 END;
 GO
 
@@ -770,6 +861,106 @@ BEGIN
   END;
   CLOSE CodOrdCursor;
   DEALLOCATE CodOrdCursor;
+END;
+GO
+
+--Trigger para capturar actualizaciones en la tabla "chasis" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_update_precio_chasis
+ON chasis
+AFTER UPDATE
+AS
+BEGIN
+    --Recalcular precio total de cada PC que usa el chasis modificado
+    DECLARE @CodOrd INT;
+    DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT o.CodOrd FROM ordenador o JOIN inserted i ON o.CodCha = i.CodCha;
+    OPEN CodOrdCursor;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC recalculaPrecioTotal @CodOrd;
+        FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    END;
+    CLOSE CodOrdCursor;
+    DEALLOCATE CodOrdCursor;
+    --Actualizar precio en contenido_carrito para chasis sueltos
+    UPDATE cc SET cc.Precio = cc.Cantidad * i.Precio FROM contenido_carrito cc JOIN inserted i ON cc.CodCha = i.CodCha;
+    --Actualizar precio en contenido_carrito para PCs empaquetados
+    UPDATE cc SET cc.Precio = cc.Cantidad * o.Precio FROM contenido_carrito cc JOIN inserted i2 ON EXISTS (SELECT 1 FROM ordenador o WHERE o.CodOrd = cc.CodOrd AND o.CodCha = i2.CodCha) JOIN ordenador o ON o.CodOrd = cc.CodOrd WHERE cc.CodOrd IS NOT NULL;
+END;
+GO
+
+--Trigger para capturar actualizaciones en la tabla "placaBase" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_update_precio_placaBase
+ON placaBase
+AFTER UPDATE
+AS
+BEGIN
+    --Recalcular precio total de cada PC que usa la placa base modificada
+    DECLARE @CodOrd INT;
+    DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT o.CodOrd FROM ordenador o JOIN inserted i ON o.CodPB = i.CodPB;
+    OPEN CodOrdCursor;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC recalculaPrecioTotal @CodOrd;
+        FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    END;
+    CLOSE CodOrdCursor;
+    DEALLOCATE CodOrdCursor;
+    --Actualizar precio en contenido_carrito para placas base sueltas
+    UPDATE cc SET cc.Precio = cc.Cantidad * i.Precio FROM contenido_carrito cc JOIN inserted i ON cc.CodPB = i.CodPB;
+    --Actualizar precio en contenido_carrito para PCs empaquetados
+    UPDATE cc SET cc.Precio = cc.Cantidad * o.Precio FROM contenido_carrito cc JOIN inserted i2 ON EXISTS (SELECT 1 FROM ordenador o WHERE o.CodOrd = cc.CodOrd AND o.CodPB = i2.CodPB) JOIN ordenador o ON o.CodOrd = cc.CodOrd WHERE cc.CodOrd IS NOT NULL;
+END;
+GO
+
+--Trigger para capturar actualizaciones en la tabla "refrigeracionCpu" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_update_precio_refrigeracionCpu
+ON refrigeracionCpu
+AFTER UPDATE
+AS
+BEGIN
+    --Recalcular precio total de cada PC que usa la refrigeración CPU modificada
+    DECLARE @CodOrd INT;
+    DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT oc.CodOrd FROM ord_cpu oc JOIN inserted i ON oc.CodRefCpu = i.CodRefCpu;
+    OPEN CodOrdCursor;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC recalculaPrecioTotal @CodOrd;
+        FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    END;
+    CLOSE CodOrdCursor;
+    DEALLOCATE CodOrdCursor;
+    --Actualizar precio en contenido_carrito para refrigeraciones CPU sueltas
+    UPDATE cc SET cc.Precio = cc.Cantidad * i.Precio FROM contenido_carrito cc JOIN inserted i ON cc.CodRefCpu = i.CodRefCpu;
+    --Actualizar precio en contenido_carrito para PCs empaquetados
+    UPDATE cc SET cc.Precio = cc.Cantidad * o.Precio FROM contenido_carrito cc JOIN inserted i2 ON EXISTS (SELECT 1 FROM ord_cpu oc WHERE oc.CodOrd = cc.CodOrd AND oc.CodRefCpu = i2.CodRefCpu) JOIN ordenador o ON o.CodOrd = cc.CodOrd WHERE cc.CodOrd IS NOT NULL;
+END;
+GO
+
+--Trigger para capturar actualizaciones en la tabla "refrigeracionGpu" y actualizar el precio total del ordenador asociado
+CREATE TRIGGER trg_update_precio_refrigeracionGpu
+ON refrigeracionGpu
+AFTER UPDATE
+AS
+BEGIN
+    --Recalcular precio total de cada PC que usa la refrigeración GPU modificada
+    DECLARE @CodOrd INT;
+    DECLARE CodOrdCursor CURSOR LOCAL FOR SELECT DISTINCT og.CodOrd FROM ord_gpu og JOIN inserted i ON og.CodRefGpu = i.CodRefGpu;
+    OPEN CodOrdCursor;
+    FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC recalculaPrecioTotal @CodOrd;
+        FETCH NEXT FROM CodOrdCursor INTO @CodOrd;
+    END;
+    CLOSE CodOrdCursor;
+    DEALLOCATE CodOrdCursor;
+    --Actualizar precio en contenido_carrito para refrigeraciones GPU sueltas
+    UPDATE cc SET cc.Precio = cc.Cantidad * i.Precio FROM contenido_carrito cc JOIN inserted i ON cc.CodRefGpu = i.CodRefGpu;
+    --Actualizar precio en contenido_carrito para PCs empaquetados
+    UPDATE cc SET cc.Precio = cc.Cantidad * o.Precio FROM contenido_carrito cc JOIN inserted i2 ON EXISTS (SELECT 1 FROM ord_gpu og WHERE og.CodOrd = cc.CodOrd AND og.CodRefGpu = i2.CodRefGpu) JOIN ordenador o ON o.CodOrd = cc.CodOrd WHERE cc.CodOrd IS NOT NULL;
 END;
 GO
 
@@ -1191,40 +1382,3 @@ VALUES (0,1,1,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(0,5,1,NULL,4
        (0,1,3,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL,NULL),(0,2,3,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL,NULL),(0,1,3,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL,NULL,NULL),
        (0,1,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,3,NULL,NULL,NULL),(0,4,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL,NULL),(0,2,4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,NULL);
        
---añadir triggers de insert y update para ordenador y contenidos que verifique la compatibilidad, devolviendo codigos que java capturará, evitando realizar la comprobación en java
---de forma similar a esto:
-
-/*CREATE TRIGGER verificar_compatibilidad_insert  
-ON ordenador_contenidos  
-INSTEAD OF INSERT  
-AS  
-BEGIN  
-    DECLARE @Incompatible BIT = 0;  
-
-    -- Simulación de comprobación de compatibilidad  
-    IF EXISTS (SELECT 1 FROM inserted WHERE /* condición de incompatibilidad */)  
-        SET @Incompatible = 1;  
-
-    IF @Incompatible = 1  
-    BEGIN  
-        -- Lanzar error con código personalizado  
-        THROW 50001, 'ERROR_1001: Componente incompatible', 1;  
-        RETURN;  
-    END  
-
-    -- Si es compatible, proceder con la inserción  
-    INSERT INTO ordenador_contenidos (col1, col2, ...)  
-    SELECT col1, col2, ... FROM inserted;  
-END;
-
-try {
-    PreparedStatement stmt = conexion.prepareStatement("INSERT INTO ordenador_contenidos (...) VALUES (...);");
-    stmt.executeUpdate();
-} catch (SQLException e) {
-    String mensaje = e.getMessage();
-    if (mensaje.contains("ERROR_1001")) {
-        System.out.println("Componente incompatible. ¿Desea intentar otro?");
-    }
-}*/
-
---añadir comentarios

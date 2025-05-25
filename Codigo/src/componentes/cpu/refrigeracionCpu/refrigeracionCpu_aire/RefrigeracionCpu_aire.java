@@ -25,6 +25,6 @@ public class RefrigeracionCpu_aire {
     @Override
     public String toString() {
         return String.format("ID refrigeraciónCPU: %d, Velocidad: %.2f",
-            this.Velocidad, this.CodRefCpu);
+            this.CodRefCpu, this.Velocidad);
     }
 }

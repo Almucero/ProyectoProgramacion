@@ -7,7 +7,7 @@ public class Usuario {
     private String Nombre;
     private String Ape1Usu;
     private String Ape2Usu;
-    private char DNI;
+    private String DNI;
     private Date FecNac;
     private String DireccionCompleta;
     private String Correo;
@@ -38,10 +38,10 @@ public class Usuario {
     public void setApe2Usu(String ape2Usu) {
         Ape2Usu = ape2Usu;
     }
-    public char getDNI() {
+    public String getDNI() {
         return DNI;
     }
-    public void setDNI(char dNI) {
+    public void setDNI(String dNI) {
         DNI = dNI;
     }
     public Date getFecNac() {
@@ -75,7 +75,7 @@ public class Usuario {
         EsAdministrador = esAdministrador;
     }
 
-    public Usuario(int CodUsu, String Nombre, String Ape1Usu, String Ape2Usu, char DNI, Date FecNac, String DireccionCompleta, String Correo, String Contrasenia, int EsAdmnistrador) {
+    public Usuario(int CodUsu, String Nombre, String Ape1Usu, String Ape2Usu, String DNI, Date FecNac, String DireccionCompleta, String Correo, String Contrasenia, int EsAdmnistrador) {
         this.CodUsu=CodUsu;
         this.Nombre=Nombre;
         this.Ape1Usu=Ape1Usu;
