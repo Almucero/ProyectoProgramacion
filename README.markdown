@@ -131,6 +131,7 @@ docker run --e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=12062006aB@" --user root -p
 - Puedes cambiar la contraseña (`MSSQL_SA_PASSWORD`) por otra válida según los requisitos de Microsoft (mínimo 8 caracteres, mayúsculas, minúsculas, números y un caracter especial).
 - Esto creará y levantará el contenedor de SQL Server automáticamente.
 - Si no se inicia automáticamente, puedes abrir Docker Desktop y arrancarlo manualmente.
+- Con esto ya estaria cargada la bbdd completamente, sin necesidad de ejecutar script alguno, de todas formas este se incluye para poder visualizarlo.
 
 ---
 
