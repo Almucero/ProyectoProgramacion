@@ -66,7 +66,7 @@ El código y la base de datos están **altamente comentados** y diseñados para 
   - El stock solo se descuenta al confirmar la compra.
   - El carrito almacena tanto componentes sueltos como ordenadores completos.
   - Si se elimina un carrito, sus contenidos se eliminan automáticamente (gracias a restricciones y triggers en la BBDD).
-  - Las compras quedan registradas y pueden be ser consultadas posteriormente.
+  - Las compras quedan registradas y pueden ser consultadas posteriormente.
 
 ---
 
