@@ -1,5 +1,0 @@
-Para crear el contenedor Docker y vincularlo a la carpeta con los datos que contienen a la bbdd: 
-
-docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=12062006aB@" --user root -p 1433:1433 --name sql1 --hostname sql1 -v <ubicación carpeta sql_server_data>:/var/opt/mssql/data -d mcr.microsoft.com/mssql/server:2022-latest
-
-(cambiar <ubicación carpeta sql_server_data> por la ruta absoluta que corresponda con dicha carpeta en el equipo)

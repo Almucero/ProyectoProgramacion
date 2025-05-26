@@ -21,13 +21,6 @@ El código y la base de datos están **altamente comentados** y diseñados para 
 
 ---
 
-## 👤 Sobre el autor
-
-- **Nombre:** Álvaro Jiménez Muñoz
-- **Estudios:** 1º DAM (Desarrollo de Aplicaciones Multiplataforma)
-
----
-
 ## 🏗️ Estructura y funcionalidades principales
 
 ### Usuarios
