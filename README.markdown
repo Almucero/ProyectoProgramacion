@@ -103,6 +103,7 @@ El código y la base de datos están **altamente comentados** y diseñados para 
 
 ### 1. **Requisitos previos**
 
+- Un IDE funcional, en este proyecto se uso [VSCode](https://code.visualstudio.com)
 - [Java JDK](https://adoptium.net/) instalado (versión 17 o superior recomendada)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y funcionando
 - (Opcional) [SQL Server Management Studio (SSMS)](https://aka.ms/ssms) para explorar la base de datos visualmente
@@ -123,7 +124,7 @@ Ejecuta este comando en la consola (como administrador), cambiando `<ruta_absolu
 Por ejemplo: `D:\ProyectoProgramación\sql_server_data`
 
 ```bash
-docker run --e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=12@9629ab8e" --user root -p 1433:1433 --name sql1 \
+docker run --e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=12062006aB@" --user root -p 1433:1433 --name sql1 \
 -v <ruta_absoluta_de_la_carpeta_sql_server_data>:/var/opt/mssql/data -d mcr.microsoft.com/mssql/server:2022-latest
 ```
 
@@ -133,15 +134,15 @@ docker run --e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=12@9629ab8e" --user root -p
 
 ---
 
-### 4. **Cargar el script de la base de datos**
+### 4. **Observar la base de datos (opcional)**
 
 - Abre SQL Server Management Studio (como administrador).
 - Conéctate usando:
   - **Server name:** la IP de tu equipo (o `localhost` si es local)
-  - **Authentication:** selecciona "Windows Authentication" o "SQL Server Authentication"
+  - **Authentication:** selecciona "SQL Server Authentication"
     - **Login:** `sa`
-    - **Password:** contraseña establecida en el comando anterior (por defecto `12@9629ab8e`)
-- Ejecuta el script SQL incluido en el repositorio (`script.sql`) para crear y poblar la base de datos.
+    - **Password:** contraseña establecida en el comando anterior (por defecto `12062006aB@`)
+- Una vez dentro ya tendrás acceso a todos los elementos de la bbdd.
 
 ---
 
