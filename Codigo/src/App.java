@@ -2,6 +2,9 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
+import carrito.Carrito;
+import carrito.CarritoService;
+import carrito.contenido_carrito.Contenido_carritoService;
 import componentes.almacenamiento.Almacenamiento;
 import componentes.almacenamiento.AlmacenamientoService;
 import componentes.chasis.Chasis;
@@ -2819,7 +2822,7 @@ public class App {
     }
 
     //inicio de sesion
-    public static boolean iniciarSesion(UsuarioService usuarioService) {
+    public static Usuario iniciarSesion(UsuarioService usuarioService) {
         while (true) {
             System.out.print("Correo: ");
             String correo = System.console().readLine();
@@ -2834,7 +2837,7 @@ public class App {
                         if (u.getEsAdministrador() == 1) {
                             System.out.print(" -- Has iniciado sesión como administrador.");
                         }
-                        return u.getEsAdministrador() == 1;
+                        return u; // <--- Devuelve el usuario autenticado
                     }
                 }
                 System.out.println("Credenciales incorrectas. Inténtelo de nuevo.");
@@ -2916,6 +2919,130 @@ public class App {
         }
     }
 
+    public static void listarUsuarios(UsuarioService usuarioService) {
+        try {
+            ArrayList<Usuario> usuarios = usuarioService.requestAll();
+            if (usuarios.isEmpty()) {
+                System.out.println("No hay usuarios.");
+            } else {
+                for (Usuario u : usuarios) {
+                    System.out.println(u);
+                    System.out.println("========================");
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error al listar usuarios: " + e.getMessage());
+        }
+        System.out.println("Pulse ENTER para continuar...");
+        System.console().readLine();
+    }
+
+    public static void borrarUsuario(UsuarioService usuarioService) {
+        try {
+            ArrayList<Usuario> usuarios = usuarioService.requestAll();
+            if (usuarios.isEmpty()) {
+                System.out.println("No hay usuarios.");
+                System.out.println("Pulse ENTER para continuar...");
+                System.console().readLine();
+                return;
+            }
+            for (Usuario u : usuarios) {
+                System.out.println(u);
+                System.out.println("========================");
+            }
+            System.out.print("Introduce el ID del usuario a borrar: ");
+            int idBorrar = leerEntero();
+            Usuario usuarioBorrar = null;
+            for (Usuario u : usuarios) {
+                if (u.getCodUsu() == idBorrar) {
+                    usuarioBorrar = u;
+                    break;
+                }
+            }
+            if (usuarioBorrar == null) {
+                System.out.println("No existe un usuario con ese ID.");
+            } else if (usuarioBorrar.getEsAdministrador() == 1) {
+                System.out.println("No se puede borrar un usuario administrador.");
+            } else {
+                boolean ok = usuarioService.delete(idBorrar);
+                if (ok) System.out.println("Usuario borrado correctamente.");
+                else System.out.println("No se pudo borrar el usuario.");
+            }
+        } catch (Exception e) {
+            System.out.println("Error al borrar usuario: " + e.getMessage());
+        }
+        System.out.println("Pulse ENTER para continuar...");
+        System.console().readLine();
+    }
+
+    public static void listarCarritos(carrito.CarritoService carritoService, carrito.contenido_carrito.Contenido_carritoService contenidoCarritoService) {
+        try {
+            ArrayList<carrito.Carrito> carritos = carritoService.requestAll();
+            if (carritos.isEmpty()) {
+                System.out.println("No hay carritos.");
+            } else {
+                for (carrito.Carrito car : carritos) {
+                    System.out.println("========================================");
+                    System.out.println("Carrito ID: " + car.getCodCar());
+                    System.out.println("Fecha: " + car.getFecha());
+                    System.out.println("Precio total: " + car.getPrecioTotal());
+                    System.out.println("Estado: " + car.getEstado());
+                    System.out.println("CodUsu: " + car.getCodUsu());
+                    System.out.println("---- Contenidos ----");
+                    ArrayList<carrito.contenido_carrito.Contenido_carrito> contenidos = contenidoCarritoService.requestAll();
+                    boolean hayContenido = false;
+                    for (carrito.contenido_carrito.Contenido_carrito cont : contenidos) {
+                        if (cont.getCodCar() == car.getCodCar()) {
+                            System.out.println(cont);
+                            hayContenido = true;
+                        }
+                    }
+                    if (!hayContenido) System.out.println("Sin contenidos.");
+                    System.out.println("========================================");
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error al listar carritos: " + e.getMessage());
+        }
+        System.out.println("Pulse ENTER para continuar...");
+        System.console().readLine();
+    }
+
+    public static void borrarCarrito(carrito.CarritoService carritoService) {
+        try {
+            ArrayList<carrito.Carrito> carritos = carritoService.requestAll();
+            if (carritos.isEmpty()) {
+                System.out.println("No hay carritos.");
+                System.out.println("Pulse ENTER para continuar...");
+                System.console().readLine();
+                return;
+            }
+            for (carrito.Carrito car : carritos) {
+                System.out.println(car);
+            }
+            System.out.print("Introduce el ID del carrito a borrar: ");
+            int idBorrar = leerEntero();
+            carrito.Carrito carritoBorrar = null;
+            for (carrito.Carrito car : carritos) {
+                if (car.getCodCar() == idBorrar) {
+                    carritoBorrar = car;
+                    break;
+                }
+            }
+            if (carritoBorrar == null) {
+                System.out.println("No existe un carrito con ese ID.");
+            } else {
+                boolean ok = carritoService.delete(idBorrar);
+                if (ok) System.out.println("Carrito borrado correctamente.");
+                else System.out.println("No se pudo borrar el carrito.");
+            }
+        } catch (Exception e) {
+            System.out.println("Error al borrar carrito: " + e.getMessage());
+        }
+        System.out.println("Pulse ENTER para continuar...");
+        System.console().readLine();
+    }
+
     //metodo para limpiar la consola
     public static void limpiarConsola() {
         System.out.print("\033[H\033[2J");
@@ -2964,6 +3091,8 @@ public class App {
         Ordenador_embebidoService embebidoService = new Ordenador_embebidoService(conn);
         Ordenador_cientificoService cientificoService = new Ordenador_cientificoService(conn);
         UsuarioService usuarioService = new UsuarioService(conn);
+        CarritoService carritoService = new CarritoService(conn);
+        Contenido_carritoService contenidoCarritoService = new Contenido_carritoService(conn);
         
         //menu principal
         while (true) {
@@ -2979,7 +3108,8 @@ public class App {
             switch (opcion) {
                 case 1:
                     limpiarConsola();
-                    boolean esAdmin = iniciarSesion(usuarioService);
+                    Usuario usuarioLogueado = iniciarSesion(usuarioService);
+                    boolean esAdmin = usuarioLogueado.getEsAdministrador()==1;
                     //menu administrador
                     if (esAdmin) {
                         while (true) {
@@ -3001,7 +3131,9 @@ public class App {
                             System.out.println("12. Montador");
                             System.out.println("13. Fabricante");
                             System.out.println("14. Servicio Testeo");
-                            System.out.println("15. Volver al menú principal");
+                            System.out.println("15. Usuarios");
+                            System.out.println("16. Carritos");
+                            System.out.println("17. Volver al menú principal");
                             System.out.print("Seleccione una opción: ");
                             int opcion2 = leerEntero();
                             switch (opcion2) {
@@ -3046,7 +3178,9 @@ public class App {
                                                     cpuService, ramService, gpuService, ventiladorService, fuenteService,
                                                     pcOficinaService, workstationService, gamingService, servidorService, embebidoService, cientificoService,
                                                     ordCpuService, ordGpuService, ordVentService, ordRamService, ordFuenService, ordAlmService
-                                                ); 
+                                                );
+                                                System.out.println("Pulse ENTER para continuar...");
+                                                System.console().readLine();
                                                 break;
                                             case 5: 
                                                 break menuOrdenador;
@@ -3070,7 +3204,7 @@ public class App {
                                             case 1: limpiarConsola(); crearAlmacenamiento(almacenamientoService); break;
                                             case 2: limpiarConsola(); editarAlmacenamiento(almacenamientoService); break;
                                             case 3: limpiarConsola(); borrarAlmacenamiento(almacenamientoService); break;
-                                            case 4: limpiarConsola(); listarAlmacenamiento(almacenamientoService); break;
+                                            case 4: limpiarConsola(); listarAlmacenamiento(almacenamientoService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuAlmacenamiento;
                                             default: System.out.println("Opción no válida.");
                                         }
@@ -3092,7 +3226,7 @@ public class App {
                                             case 1: limpiarConsola(); crearChasis(chasisService); break;
                                             case 2: limpiarConsola(); editarChasis(chasisService); break;
                                             case 3: limpiarConsola(); borrarChasis(chasisService); break;
-                                            case 4: limpiarConsola(); listarChasis(chasisService); break;
+                                            case 4: limpiarConsola(); listarChasis(chasisService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuChasis;
                                             default: System.out.println("Opción no válida.");
                                         }
@@ -3114,7 +3248,7 @@ public class App {
                                             case 1: limpiarConsola(); crearCpu(cpuService); break;
                                             case 2: limpiarConsola(); editarCpu(cpuService); break;
                                             case 3: limpiarConsola(); borrarCpu(cpuService); break;
-                                            case 4: limpiarConsola(); listarCpu(cpuService); break;
+                                            case 4: limpiarConsola(); listarCpu(cpuService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuCpu;
                                             default: System.out.println("Opción no válida.");
                                         }
@@ -3136,7 +3270,7 @@ public class App {
                                             case 1: limpiarConsola(); crearRam(ramService); break;
                                             case 2: limpiarConsola(); editarRam(ramService); break;
                                             case 3: limpiarConsola(); borrarRam(ramService); break;
-                                            case 4: limpiarConsola(); listarRam(ramService); break;
+                                            case 4: limpiarConsola(); listarRam(ramService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuRam;
                                             default: System.out.println("Opción no válida.");
                                         }
@@ -3158,7 +3292,7 @@ public class App {
                                             case 1: limpiarConsola(); crearGpu(gpuService); break;
                                             case 2: limpiarConsola(); editarGpu(gpuService); break;
                                             case 3: limpiarConsola(); borrarGpu(gpuService); break;
-                                            case 4: limpiarConsola(); listarGpu(gpuService); break;
+                                            case 4: limpiarConsola(); listarGpu(gpuService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuGpu;
                                             default: System.out.println("Opción no válida.");
                                         }
@@ -3180,7 +3314,7 @@ public class App {
                                             case 1: limpiarConsola(); crearPlacaBase(placaBaseService); break;
                                             case 2: limpiarConsola(); editarPlacaBase(placaBaseService); break;
                                             case 3: limpiarConsola(); borrarPlacaBase(placaBaseService); break;
-                                            case 4: limpiarConsola(); listarPlacaBase(placaBaseService); break;
+                                            case 4: limpiarConsola(); listarPlacaBase(placaBaseService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuPlacaBase;
                                             default: System.out.println("Opción no válida.");
                                         }
@@ -3202,7 +3336,7 @@ public class App {
                                             case 1: limpiarConsola(); crearFuente(fuenteService); break;
                                             case 2: limpiarConsola(); editarFuente(fuenteService); break;
                                             case 3: limpiarConsola(); borrarFuente(fuenteService); break;
-                                            case 4: limpiarConsola(); listarFuente(fuenteService); break;
+                                            case 4: limpiarConsola(); listarFuente(fuenteService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuFuente;
                                             default: System.out.println("Opción no válida.");
                                         }
@@ -3224,7 +3358,7 @@ public class App {
                                             case 1: limpiarConsola(); crearVentilador(ventiladorService); break;
                                             case 2: limpiarConsola(); editarVentilador(ventiladorService); break;
                                             case 3: limpiarConsola(); borrarVentilador(ventiladorService); break;
-                                            case 4: limpiarConsola(); listarVentilador(ventiladorService); break;
+                                            case 4: limpiarConsola(); listarVentilador(ventiladorService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuVentilador;
                                             default: System.out.println("Opción no válida.");
                                         }
@@ -3246,7 +3380,7 @@ public class App {
                                             case 1: limpiarConsola(); crearRefrigeracionCpu(refrigeracionCpuService, refrigeracionCpuAireService, refrigeracionCpuLiquidaService); break;
                                             case 2: limpiarConsola(); editarRefrigeracionCpu(refrigeracionCpuService, refrigeracionCpuAireService, refrigeracionCpuLiquidaService); break;
                                             case 3: limpiarConsola(); borrarRefrigeracionCpu(refrigeracionCpuService); break;
-                                            case 4: limpiarConsola(); listarRefrigeracionCpu(refrigeracionCpuService, refrigeracionCpuAireService, refrigeracionCpuLiquidaService); break;
+                                            case 4: limpiarConsola(); listarRefrigeracionCpu(refrigeracionCpuService, refrigeracionCpuAireService, refrigeracionCpuLiquidaService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuRefrigeracionCpu;
                                             default: System.out.println("Opción no válida.");
                                         }
@@ -3268,7 +3402,7 @@ public class App {
                                             case 1: limpiarConsola(); crearRefrigeracionGpu(refrigeracionGpuService, refrigeracionGpuAireService, refrigeracionGpuLiquidaService); break;
                                             case 2: limpiarConsola(); editarRefrigeracionGpu(refrigeracionGpuService, refrigeracionGpuAireService, refrigeracionGpuLiquidaService); break;
                                             case 3: limpiarConsola(); borrarRefrigeracionGpu(refrigeracionGpuService); break;
-                                            case 4: limpiarConsola(); listarRefrigeracionGpu(refrigeracionGpuService, refrigeracionGpuAireService, refrigeracionGpuLiquidaService); break;
+                                            case 4: limpiarConsola(); listarRefrigeracionGpu(refrigeracionGpuService, refrigeracionGpuAireService, refrigeracionGpuLiquidaService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuRefrigeracionCpu;
                                             default: System.out.println("Opción no válida.");
                                         }
@@ -3290,7 +3424,7 @@ public class App {
                                             case 1: limpiarConsola(); crearMontador(montadorService); break;
                                             case 2: limpiarConsola(); editarMontador(montadorService); break;
                                             case 3: limpiarConsola(); borrarMontador(montadorService); break;
-                                            case 4: limpiarConsola(); listarMontador(montadorService); break;
+                                            case 4: limpiarConsola(); listarMontador(montadorService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuMontador;
                                             default: System.out.println("Opción no válida.");
                                         }
@@ -3312,7 +3446,7 @@ public class App {
                                             case 1: limpiarConsola(); crearFabricante(fabricanteService); break;
                                             case 2: limpiarConsola(); editarFabricante(fabricanteService); break;
                                             case 3: limpiarConsola(); borrarFabricante(fabricanteService); break;
-                                            case 4: limpiarConsola(); listarFabricante(fabricanteService); break;
+                                            case 4: limpiarConsola(); listarFabricante(fabricanteService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuFabricante;
                                             default: System.out.println("Opción no válida.");
                                         }
@@ -3334,13 +3468,49 @@ public class App {
                                             case 1: limpiarConsola(); crearServicioTesteo(servicioTesteoService); break;
                                             case 2: limpiarConsola(); editarServicioTesteo(servicioTesteoService); break;
                                             case 3: limpiarConsola(); borrarServicioTesteo(servicioTesteoService); break;
-                                            case 4: limpiarConsola(); listarServicioTesteo(servicioTesteoService); break;
+                                            case 4: limpiarConsola(); listarServicioTesteo(servicioTesteoService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
                                             case 5: break menuServicioTesteo;
                                             default: System.out.println("Opción no válida.");
                                         }
                                     }
                                     break;
                                 case 15:
+                                    menuUsuarios:
+                                    while (true) {
+                                        limpiarConsola();
+                                        System.out.println("\n--- MENÚ USUARIOS ---");
+                                        System.out.println("1. Listar usuarios");
+                                        System.out.println("2. Borrar usuario");
+                                        System.out.println("3. Salir");
+                                        System.out.print("Elija una opción: ");
+                                        int opcionUsu = leerEntero();
+                                        switch (opcionUsu) {
+                                            case 1: limpiarConsola(); listarUsuarios(usuarioService); break;
+                                            case 2: limpiarConsola(); borrarUsuario(usuarioService); break;
+                                            case 3: break menuUsuarios;
+                                            default: System.out.println("Opción no válida."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                        }
+                                    }
+                                    break;
+                                case 16:
+                                    menuCarritos:
+                                    while (true) {
+                                        limpiarConsola();
+                                        System.out.println("\n--- MENÚ CARRITOS ---");
+                                        System.out.println("1. Listar carritos");
+                                        System.out.println("2. Borrar carrito");
+                                        System.out.println("3. Salir");
+                                        System.out.print("Elija una opción: ");
+                                        int opcionCar = leerEntero();
+                                        switch (opcionCar) {
+                                            case 1: limpiarConsola(); listarCarritos(carritoService, contenidoCarritoService); break;
+                                            case 2: limpiarConsola(); borrarCarrito(carritoService); break;
+                                            case 3: break menuCarritos;
+                                            default: System.out.println("Opción no válida."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                        }
+                                    }
+                                    break;
+                                case 17:
                                     break;
                                 default:
                                     System.out.println("Opción no válida.");
@@ -3352,8 +3522,306 @@ public class App {
                     } 
                     //menu usuario
                     else {
-                        // menuUsuario( ... ) // Espacio reservado para menú de usuario normal
-                    }
+                        int codUsuActual = usuarioLogueado.getCodUsu();
+                        carrito.Carrito carritoActual = null;
+                        try {
+                            ArrayList<carrito.Carrito> carritos = carritoService.requestAll();
+                            for (carrito.Carrito c : carritos) {
+                                if (c.getCodUsu() == codUsuActual && c.getEstado().equals("compraNoRealizada")) {
+                                    carritoActual = c;
+                                    break;
+                                }
+                            }
+                            if (carritoActual == null) {
+                                int id = (int)carritoService.create(new carrito.Carrito(0, new java.sql.Date(System.currentTimeMillis()), 0, "compraNoRealizada", codUsuActual));
+                                carritoActual = carritoService.requestById(id);
+                            }
+                        } catch (Exception e) {
+                            System.out.println("Error al crear carrito: " + e.getMessage());
+                            return;
+                        }
+
+                        while (true) {
+                            limpiarConsola();
+                            System.out.println("========= MENÚ USUARIO =========");
+                            System.out.println("1. Ver contenidos de la tienda");
+                            System.out.println("2. Comprar (añadir productos al carrito)");
+                            System.out.println("3. Confirmar compra");
+                            System.out.println("4. Ver mis compras");
+                            System.out.println("5. Salir");
+                            System.out.print("Seleccione una opción: ");
+                            int opUsu = leerEntero();
+                            switch (opUsu) {
+                                case 1:
+                                    menuVerTienda:
+                                    while (true) {
+                                        limpiarConsola();
+                                        System.out.println("--- Ver contenidos de la tienda ---");
+                                        System.out.println("1. Ordenadores");
+                                        System.out.println("2. Almacenamiento");
+                                        System.out.println("3. Chasis");
+                                        System.out.println("4. CPU");
+                                        System.out.println("5. RAM");
+                                        System.out.println("6. GPU");
+                                        System.out.println("7. Placa Base");
+                                        System.out.println("8. Fuente");
+                                        System.out.println("9. Ventilador");
+                                        System.out.println("10. Refrigeración CPU");
+                                        System.out.println("11. Refrigeración GPU");
+                                        System.out.println("12. Montador");
+                                        System.out.println("13. Fabricante");
+                                        System.out.println("14. Servicio Testeo");
+                                        System.out.println("15. Volver");
+                                        System.out.print("Elija una opción: ");
+                                        int opVer = leerEntero();
+                                        switch (opVer) {
+                                            case 1: limpiarConsola(); listarOrdenadores(ordenadorService, chasisService, placaBaseService, almacenamientoService, cpuService, ramService, gpuService, ventiladorService, fuenteService, pcOficinaService, workstationService, gamingService, servidorService, embebidoService, cientificoService, ordCpuService, ordGpuService, ordVentService, ordRamService, ordFuenService, ordAlmService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 2: limpiarConsola(); listarAlmacenamiento(almacenamientoService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 3: limpiarConsola(); listarChasis(chasisService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 4: limpiarConsola(); listarCpu(cpuService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 5: limpiarConsola(); listarRam(ramService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 6: limpiarConsola(); listarGpu(gpuService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 7: limpiarConsola(); listarPlacaBase(placaBaseService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 8: limpiarConsola(); listarFuente(fuenteService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 9: limpiarConsola(); listarVentilador(ventiladorService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 10: limpiarConsola(); listarRefrigeracionCpu(refrigeracionCpuService, refrigeracionCpuAireService, refrigeracionCpuLiquidaService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 11: limpiarConsola(); listarRefrigeracionGpu(refrigeracionGpuService, refrigeracionGpuAireService, refrigeracionGpuLiquidaService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 12: limpiarConsola(); listarMontador(montadorService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 13: limpiarConsola(); listarFabricante(fabricanteService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 14: limpiarConsola(); listarServicioTesteo(servicioTesteoService); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break;
+                                            case 15: break menuVerTienda;
+                                            default: System.out.println("Opción no válida."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                        }
+                                    }
+                                    break;
+                                case 2:
+                                    menuComprar:
+                                    while (true) {
+                                        limpiarConsola();
+                                        System.out.println("--- Comprar: añadir productos al carrito ---");
+                                        System.out.println("1. Ordenadores");
+                                        System.out.println("2. Almacenamiento");
+                                        System.out.println("3. Chasis");
+                                        System.out.println("4. CPU");
+                                        System.out.println("5. RAM");
+                                        System.out.println("6. GPU");
+                                        System.out.println("7. Placa Base");
+                                        System.out.println("8. Fuente");
+                                        System.out.println("9. Ventilador");
+                                        System.out.println("10. Refrigeración CPU");
+                                        System.out.println("11. Refrigeración GPU");
+                                        System.out.println("12. Volver");
+                                        System.out.print("Elija una opción: ");
+                                        int opComp = leerEntero();
+                                        int cantidad, id;
+                                        switch (opComp) {
+                                            case 1: // Ordenadores
+                                                limpiarConsola(); listarOrdenadores(ordenadorService, chasisService, placaBaseService, almacenamientoService, cpuService, ramService, gpuService, ventiladorService, fuenteService, pcOficinaService, workstationService, gamingService, servidorService, embebidoService, cientificoService, ordCpuService, ordGpuService, ordVentService, ordRamService, ordFuenService, ordAlmService);
+                                                System.out.print("ID de ordenador a añadir: "); id = leerEntero();
+                                                Ordenador ord = ordenadorService.requestById(id);
+                                                if (ord == null) { System.out.println("No existe ese ordenador."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                System.out.print("Cantidad: "); cantidad = leerEntero();
+                                                if (cantidad > ord.getStock()) { System.out.println("No hay suficiente stock. Stock disponible: " + ord.getStock()); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                contenidoCarritoService.create(new carrito.contenido_carrito.Contenido_carrito(0, 0, cantidad, carritoActual.getCodCar(), id, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+                                                System.out.println("Añadido al carrito.");
+                                                System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                                break;
+                                            case 2: // Almacenamiento
+                                                limpiarConsola(); listarAlmacenamiento(almacenamientoService);
+                                                System.out.print("ID de almacenamiento a añadir: "); id = leerEntero();
+                                                Almacenamiento alm = almacenamientoService.requestById(id);
+                                                if (alm == null) { System.out.println("No existe ese almacenamiento."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                System.out.print("Cantidad: "); cantidad = leerEntero();
+                                                if (cantidad > alm.getStock()) { System.out.println("No hay suficiente stock. Stock disponible: " + alm.getStock()); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                contenidoCarritoService.create(new carrito.contenido_carrito.Contenido_carrito(0, 0, cantidad, carritoActual.getCodCar(), 0, 0, 0, 0, id, 0, 0, 0, 0, 0, 0));
+                                                System.out.println("Añadido al carrito.");
+                                                System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                                break;
+                                            case 3: // Chasis
+                                                limpiarConsola(); listarChasis(chasisService);
+                                                System.out.print("ID de chasis a añadir: "); id = leerEntero();
+                                                Chasis cha = chasisService.requestById(id);
+                                                if (cha == null) { System.out.println("No existe ese chasis."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                System.out.print("Cantidad: "); cantidad = leerEntero();
+                                                if (cantidad > cha.getStock()) { System.out.println("No hay suficiente stock. Stock disponible: " + cha.getStock()); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                contenidoCarritoService.create(new carrito.contenido_carrito.Contenido_carrito(0, 0, cantidad, carritoActual.getCodCar(), 0, id, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+                                                System.out.println("Añadido al carrito.");
+                                                System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                                break;
+                                            case 4: // CPU
+                                                limpiarConsola(); listarCpu(cpuService);
+                                                System.out.print("ID de CPU a añadir: "); id = leerEntero();
+                                                Cpu cpu = cpuService.requestById(id);
+                                                if (cpu == null) { System.out.println("No existe esa CPU."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                System.out.print("Cantidad: "); cantidad = leerEntero();
+                                                if (cantidad > cpu.getStock()) { System.out.println("No hay suficiente stock. Stock disponible: " + cpu.getStock()); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                contenidoCarritoService.create(new carrito.contenido_carrito.Contenido_carrito(0, 0, cantidad, carritoActual.getCodCar(), 0, 0, 0, 0, 0, 0, 0, id, 0, 0, 0));
+                                                System.out.println("Añadido al carrito.");
+                                                System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                                break;
+                                            case 5: // RAM
+                                                limpiarConsola(); listarRam(ramService);
+                                                System.out.print("ID de RAM a añadir: "); id = leerEntero();
+                                                Ram ram = ramService.requestById(id);
+                                                if (ram == null) { System.out.println("No existe esa RAM."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                System.out.print("Cantidad: "); cantidad = leerEntero();
+                                                if (cantidad > ram.getStock()) { System.out.println("No hay suficiente stock. Stock disponible: " + ram.getStock()); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                contenidoCarritoService.create(new carrito.contenido_carrito.Contenido_carrito(0, 0, cantidad, carritoActual.getCodCar(), 0, 0, 0, 0, 0, id, 0, 0, 0, 0, 0));
+                                                System.out.println("Añadido al carrito.");
+                                                System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                                break;
+                                            case 6: // GPU
+                                                limpiarConsola(); listarGpu(gpuService);
+                                                System.out.print("ID de GPU a añadir: "); id = leerEntero();
+                                                Gpu gpu = gpuService.requestById(id);
+                                                if (gpu == null) { System.out.println("No existe esa GPU."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                System.out.print("Cantidad: "); cantidad = leerEntero();
+                                                if (cantidad > gpu.getStock()) { System.out.println("No hay suficiente stock. Stock disponible: " + gpu.getStock()); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                contenidoCarritoService.create(new carrito.contenido_carrito.Contenido_carrito(0, 0, cantidad, carritoActual.getCodCar(), 0, 0, 0, 0, 0, 0, id, 0, 0, 0, 0));
+                                                System.out.println("Añadido al carrito.");
+                                                System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                                break;
+                                            case 7: // Placa Base
+                                                limpiarConsola(); listarPlacaBase(placaBaseService);
+                                                System.out.print("ID de placa base a añadir: "); id = leerEntero();
+                                                PlacaBase pb = placaBaseService.requestById(id);
+                                                if (pb == null) { System.out.println("No existe esa placa base."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                System.out.print("Cantidad: "); cantidad = leerEntero();
+                                                if (cantidad > pb.getStock()) { System.out.println("No hay suficiente stock. Stock disponible: " + pb.getStock()); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                contenidoCarritoService.create(new carrito.contenido_carrito.Contenido_carrito(0, 0, cantidad, carritoActual.getCodCar(), 0, 0, 0, id, 0, 0, 0, 0, 0, 0, 0));
+                                                System.out.println("Añadido al carrito.");
+                                                System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                                break;
+                                            case 8: // Fuente
+                                                limpiarConsola(); listarFuente(fuenteService);
+                                                System.out.print("ID de fuente a añadir: "); id = leerEntero();
+                                                Fuente fuen = fuenteService.requestById(id);
+                                                if (fuen == null) { System.out.println("No existe esa fuente."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                System.out.print("Cantidad: "); cantidad = leerEntero();
+                                                if (cantidad > fuen.getStock()) { System.out.println("No hay suficiente stock. Stock disponible: " + fuen.getStock()); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                contenidoCarritoService.create(new carrito.contenido_carrito.Contenido_carrito(0, 0, cantidad, carritoActual.getCodCar(), 0, 0, id, 0, 0, 0, 0, 0, 0, 0, 0));
+                                                System.out.println("Añadido al carrito.");
+                                                System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                                break;
+                                            case 9: // Ventilador
+                                                limpiarConsola(); listarVentilador(ventiladorService);
+                                                System.out.print("ID de ventilador a añadir: "); id = leerEntero();
+                                                Ventilador vent = ventiladorService.requestById(id);
+                                                if (vent == null) { System.out.println("No existe ese ventilador."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                System.out.print("Cantidad: "); cantidad = leerEntero();
+                                                if (cantidad > vent.getStock()) { System.out.println("No hay suficiente stock. Stock disponible: " + vent.getStock()); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                contenidoCarritoService.create(new carrito.contenido_carrito.Contenido_carrito(0, 0, cantidad, carritoActual.getCodCar(), 0, 0, 0, 0, 0, 0, 0, id, 0, 0, 0));
+                                                System.out.println("Añadido al carrito.");
+                                                System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                                break;
+                                            case 10: // Refrigeración CPU
+                                                limpiarConsola(); listarRefrigeracionCpu(refrigeracionCpuService, refrigeracionCpuAireService, refrigeracionCpuLiquidaService);
+                                                System.out.print("ID de refrigeración CPU a añadir: "); id = leerEntero();
+                                                RefrigeracionCpu refCpu = refrigeracionCpuService.requestById(id);
+                                                if (refCpu == null) { System.out.println("No existe esa refrigeración CPU."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                System.out.print("Cantidad: "); cantidad = leerEntero();
+                                                if (cantidad > refCpu.getStock()) { System.out.println("No hay suficiente stock. Stock disponible: " + refCpu.getStock()); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                contenidoCarritoService.create(new carrito.contenido_carrito.Contenido_carrito(0, 0, cantidad, carritoActual.getCodCar(), 0, 0, 0, 0, 0, 0, 0, 0, id, 0, 0));
+                                            System.out.println("Añadido al carrito.");
+                                                System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                                break;
+                                            case 11: // Refrigeración GPU
+                                                limpiarConsola(); listarRefrigeracionGpu(refrigeracionGpuService, refrigeracionGpuAireService, refrigeracionGpuLiquidaService);
+                                                System.out.print("ID de refrigeración GPU a añadir: "); id = leerEntero();
+                                                RefrigeracionGpu refGpu = refrigeracionGpuService.requestById(id);
+                                                if (refGpu == null) { System.out.println("No existe esa refrigeración GPU."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                System.out.print("Cantidad: "); cantidad = leerEntero();
+                                                if (cantidad > refGpu.getStock()) { System.out.println("No hay suficiente stock. Stock disponible: " + refGpu.getStock()); System.out.println("Pulse ENTER para continuar..."); System.console().readLine(); break; }
+                                                contenidoCarritoService.create(new carrito.contenido_carrito.Contenido_carrito(0, 0, cantidad, carritoActual.getCodCar(), 0, 0, 0, 0, 0, 0, 0, 0, 0, id, 0));
+                                                System.out.println("Añadido al carrito.");
+                                                System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                                break;
+                                            case 12: break menuComprar;
+                                            default: System.out.println("Opción no válida."); System.out.println("Pulse ENTER para continuar..."); System.console().readLine();
+                                        }
+                                    }
+                                    break;
+                                case 3:
+                                    limpiarConsola();
+                                    System.out.println("--- Confirmar compra ---");
+                                    ArrayList<carrito.contenido_carrito.Contenido_carrito> contenidos;
+                                    try {
+                                        contenidos = contenidoCarritoService.requestAll();
+                                        boolean hayContenido = false;
+                                        for (carrito.contenido_carrito.Contenido_carrito cont : contenidos) {
+                                            if (cont.getCodCar() == carritoActual.getCodCar()) {
+                                                System.out.println(cont);
+                                                hayContenido = true;
+                                            }
+                                        }
+                                        if (!hayContenido) {
+                                            System.out.println("El carrito está vacío.");
+                                            System.out.println("Pulse ENTER para continuar...");
+                                            System.console().readLine();
+                                            break;
+                                        }
+                                    } catch (Exception e) {
+                                        System.out.println("Error al mostrar el carrito: " + e.getMessage());
+                                        break;
+                                    }
+                                    System.out.print("¿Desea realizar la compra? (s/n): ");
+                                    String resp = System.console().readLine();
+                                    if (resp.equalsIgnoreCase("s")) {
+                                        carritoActual.setEstado("compraRealizada");
+                                        carritoService.update(carritoActual);
+                                        int idNuevo = (int)carritoService.create(new carrito.Carrito(0, new java.sql.Date(System.currentTimeMillis()), 0, "compraNoRealizada", codUsuActual));
+                                        carritoActual = carritoService.requestById(idNuevo);
+                                        System.out.println("¡Compra realizada!");
+                                    } else {
+                                        System.out.println("Compra cancelada.");
+                                    }
+                                    System.out.println("Pulse ENTER para continuar...");
+                                    System.console().readLine();
+                                    break;
+                                case 4:
+                                    limpiarConsola();
+                                    System.out.println("--- Mis compras ---");
+                                    try {
+                                        ArrayList<carrito.Carrito> carritos = carritoService.requestAll();
+                                        ArrayList<carrito.contenido_carrito.Contenido_carrito> todosContenidos = contenidoCarritoService.requestAll();
+                                        boolean hayCompras = false;
+                                        for (carrito.Carrito car : carritos) {
+                                            if (car.getCodUsu() == codUsuActual && car.getEstado().equals("compraRealizada")) {
+                                                hayCompras = true;
+                                                System.out.println("========================================");
+                                                System.out.println("Carrito ID: " + car.getCodCar());
+                                                System.out.println("Fecha: " + car.getFecha());
+                                                System.out.println("Precio total: " + car.getPrecioTotal());
+                                                System.out.println("Estado: " + car.getEstado());
+                                                System.out.println("---- Contenidos ----");
+                                                boolean hayContenido = false;
+                                                for (carrito.contenido_carrito.Contenido_carrito cont : todosContenidos) {
+                                                    if (cont.getCodCar() == car.getCodCar()) {
+                                                        System.out.println(cont);
+                                                        hayContenido = true;
+                                                    }
+                                                }
+                                                if (!hayContenido) System.out.println("Sin contenidos.");
+                                                System.out.println("========================================");
+                                            }
+                                        }
+                                        if (!hayCompras) System.out.println("No hay compras realizadas.");
+                                    } catch (Exception e) {
+                                        System.out.println("Error al mostrar compras: " + e.getMessage());
+                                    }
+                                    System.out.println("Pulse ENTER para continuar...");
+                                    System.console().readLine();
+                                    break;
+                                case 5:
+                                    break;
+                                default:
+                                    System.out.println("Opción no válida.");
+                                    System.out.println("Pulse ENTER para continuar...");
+                                    System.console().readLine();
+                            }
+                            if (opUsu == 5) break;
+                        }
+                    } 
                     break;
                 case 2:
                     limpiarConsola();

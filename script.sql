@@ -1,6 +1,6 @@
-CREATE DATABASE ProyectoProgramacionSqlServer_v73
+CREATE DATABASE ProyectoProgramacionSqlServer_v74
 GO
-USE ProyectoProgramacionSqlServer_v73
+USE ProyectoProgramacionSqlServer_v74
 GO
 
 --Se establece el formato de la fecha en año-mes-dia, para evitar problemas al luego insertar datos
@@ -277,7 +277,7 @@ CREATE TABLE usuario
  Nombre VARCHAR(50) NOT NULL,
  Ape1Usu VARCHAR(50) NOT NULL,
  Ape2Usu VARCHAR(50) NULL,
- DNI CHAR(9) NOT NULL UNIQUE CHECK (LEN(DNI)=9 AND DNI LIKE (REPLICATE('[0-9]',8)+'[A-Z]')),
+ DNI CHAR(9) NOT NULL UNIQUE CHECK (DNI LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][A-Z]'),
  FecNac DATE NOT NULL CHECK (FecNac <= DATEADD(YEAR, -18, GETDATE())),
  DireccionCompleta VARCHAR(200) NOT NULL,
  Correo VARCHAR(100) NOT NULL,
